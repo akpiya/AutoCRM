@@ -8,21 +8,11 @@
   <key>RunAtLoad</key>
   <true/>
 
-  <!-- Run periodically while user is logged in and Mac is awake -->
   <key>StartInterval</key>
   <integer>120</integer>
 
   <key>EnvironmentVariables</key>
   <dict>
-    <key>AUTOCRM_NOTION_TOKEN</key>
-    <string>REPLACE_WITH_NOTION_INTEGRATION_TOKEN</string>
-    <key>AUTOCRM_NOTION_DATABASE_ID</key>
-    <string>REPLACE_WITH_PEOPLE_DATABASE_ID</string>
-
-    <!-- Optional: only needed if you use Beeper Desktop -->
-    <key>BEEPER_DESKTOP_TOKEN</key>
-    <string>REPLACE_WITH_BEEPER_TOKEN</string>
-
     <key>PATH</key>
     <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
   </dict>

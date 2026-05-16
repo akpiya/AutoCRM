@@ -1,111 +1,99 @@
-"""SQLite outbox for offline / retry."""
+"""SQLite outbox for collector events and per-source cursors."""
 
 from __future__ import annotations
 
 import sqlite3
 import time
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator
+
+from autocrm.common import OUTBOX_DB_PATH
+
+_SCHEMA = """
+CREATE TABLE IF NOT EXISTS outbox (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  platform TEXT NOT NULL,
+  party_id TEXT NOT NULL,
+  direction INTEGER NOT NULL,
+  created_at REAL NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS cursor (
+  source TEXT PRIMARY KEY,
+  cursor_value REAL,
+  updated_at REAL NOT NULL
+);
+"""
 
 
-def init_db(db_path: Path) -> None:
+def init_db(db_path: Path = OUTBOX_DB_PATH) -> None:
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(db_path)
     try:
-        conn.execute(
-            """
-            CREATE TABLE IF NOT EXISTS outbox (
-              id INTEGER PRIMARY KEY AUTOINCREMENT,
-              payload_json TEXT NOT NULL,
-              created_at REAL NOT NULL,
-              status TEXT NOT NULL DEFAULT 'pending',
-              attempts INTEGER NOT NULL DEFAULT 0,
-              last_error TEXT,
-              dedupe_id TEXT UNIQUE
-            )
-            """
-        )
-        conn.execute(
-            "CREATE INDEX IF NOT EXISTS idx_outbox_status ON outbox(status, id)"
-        )
+        conn.executescript(_SCHEMA)
         conn.commit()
     finally:
         conn.close()
 
 
-def enqueue(
-    db_path: Path,
-    payload_json: str,
-    dedupe_id: str | None,
-) -> int | None:
-    """Insert row. Returns row id, or None if dedupe_id conflict."""
+@contextmanager
+def _connect(db_path: Path, *, write: bool = False) -> Iterator[sqlite3.Connection]:
     init_db(db_path)
     conn = sqlite3.connect(db_path)
     try:
-        now = time.time()
-        try:
-            cur = conn.execute(
-                "INSERT INTO outbox (payload_json, created_at, status, dedupe_id) VALUES (?, ?, 'pending', ?)",
-                (payload_json, now, dedupe_id),
-            )
+        yield conn
+        if write:
             conn.commit()
-            return int(cur.lastrowid)
-        except sqlite3.IntegrityError:
-            conn.rollback()
-            return None
     finally:
         conn.close()
 
 
-def fetch_pending_batch(db_path: Path, limit: int = 10) -> list[tuple[int, str, str | None]]:
-    init_db(db_path)
-    conn = sqlite3.connect(db_path)
-    try:
+def add_row(
+    platform: str,
+    party_id: str,
+    direction: int,
+    timestamp: float,
+    *,
+    db_path: Path = OUTBOX_DB_PATH,
+) -> int:
+    with _connect(db_path, write=True) as conn:
         cur = conn.execute(
-            "SELECT id, payload_json, dedupe_id FROM outbox WHERE status = 'pending' ORDER BY id LIMIT ?",
-            (limit,),
+            "INSERT INTO outbox (platform, party_id, direction, created_at) "
+            "VALUES (?, ?, ?, ?)",
+            (platform, party_id, direction, timestamp),
         )
-        return [(int(r[0]), str(r[1]), r[2]) for r in cur.fetchall()]
-    finally:
-        conn.close()
+        return int(cur.lastrowid)
 
 
-def mark_sent(db_path: Path, row_id: int) -> None:
-    conn = sqlite3.connect(db_path)
-    try:
-        conn.execute("UPDATE outbox SET status = 'sent' WHERE id = ?", (row_id,))
-        conn.commit()
-    finally:
-        conn.close()
+def get_cursor(source: str, *, db_path: Path = OUTBOX_DB_PATH) -> float | None:
+    with _connect(db_path) as conn:
+        row = conn.execute(
+            "SELECT cursor_value FROM cursor WHERE source = ?",
+            (source,),
+        ).fetchone()
+    if row is None or row[0] is None:
+        return None
+    return float(row[0])
 
 
-def mark_failed(db_path: Path, row_id: int, err: str) -> None:
-    conn = sqlite3.connect(db_path)
-    try:
+def set_cursor(
+    source: str,
+    cursor_value: float | None,
+    *,
+    db_path: Path = OUTBOX_DB_PATH,
+) -> None:
+    with _connect(db_path, write=True) as conn:
         conn.execute(
-            "UPDATE outbox SET status = 'failed', attempts = attempts + 1, last_error = ? WHERE id = ?",
-            (err[:2000], row_id),
+            "INSERT INTO cursor (source, cursor_value, updated_at) "
+            "VALUES (?, ?, ?) "
+            "ON CONFLICT(source) DO UPDATE SET "
+            "cursor_value = excluded.cursor_value, "
+            "updated_at = excluded.updated_at",
+            (source, cursor_value, time.time()),
         )
-        conn.commit()
-    finally:
-        conn.close()
 
 
-def delete_row(db_path: Path, row_id: int) -> None:
-    conn = sqlite3.connect(db_path)
-    try:
+def delete_row(row_id: int, *, db_path: Path = OUTBOX_DB_PATH) -> None:
+    with _connect(db_path, write=True) as conn:
         conn.execute("DELETE FROM outbox WHERE id = ?", (row_id,))
-        conn.commit()
-    finally:
-        conn.close()
-
-
-def pending_count(db_path: Path) -> int:
-    init_db(db_path)
-    conn = sqlite3.connect(db_path)
-    try:
-        cur = conn.execute(
-            "SELECT COUNT(*) FROM outbox WHERE status = 'pending'"
-        )
-        return int(cur.fetchone()[0])
-    finally:
-        conn.close()
