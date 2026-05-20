@@ -8,14 +8,17 @@ Collectors read outbound activity from local sources and append rows to a SQLite
 |--------|------|
 | **`main.py`** | Entrypoint: run collectors serially (iMessage → phone → Beeper). |
 | **`outbox.py`** | SQLite outbox + per-source cursors. |
-| **`common.py`** | `~/.autocrm` paths. |
+| **`common.py`** | Paths, Apple epoch conversion, `PLATFORM_TEXT`, `DIRECTION_OUTBOUND`. |
 | **`collectors/collector.py`** | `Collector` interface and `CollectResult`. |
-| **`collectors/imessage.py`** | iMessage/SMS stub. |
+| **`collectors/imessage_db.py`** | Query outbound rows from `chat.db`. |
+| **`collectors/imessage.py`** | iMessage collector → outbox (`platform="text"`). |
 | **`collectors/phone.py`** | Phone/FaceTime call-history stub. |
 | **`collectors/beeper.py`** | Beeper Desktop stub. |
 
 ## Usage
 
 ```bash
+python3 -m pip install -e ".[dev]"
+pytest
 python3 -m autocrm.main
 ```
