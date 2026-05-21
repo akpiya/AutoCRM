@@ -14,6 +14,18 @@ class MessageRow:
     handle_id: str | None
 
 
+def max_message_rowid(chat_db: Path) -> int:
+    uri = f"file:{chat_db}?mode=ro"
+    conn = sqlite3.connect(uri, uri=True)
+    try:
+        row = conn.execute("SELECT MAX(ROWID) FROM message").fetchone()
+    finally:
+        conn.close()
+    if row is None or row[0] is None:
+        return 0
+    return int(row[0])
+
+
 def fetch_outbound_messages(chat_db: Path, after_rowid: int) -> list[MessageRow]:
     uri = f"file:{chat_db}?mode=ro"
     conn = sqlite3.connect(uri, uri=True)
