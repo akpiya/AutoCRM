@@ -5,17 +5,24 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
 import time
 import urllib.error
 import urllib.request
 from collections import defaultdict
 from collections.abc import Mapping
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
 from autocrm import outbox
-from autocrm.common import DIRECTION_INBOUND, DIRECTION_OUTBOUND, OUTBOX_DB_PATH
+from autocrm.common import (
+    DIRECTION_INBOUND,
+    DIRECTION_OUTBOUND,
+    NOTION_PATCH_WORKERS,
+    OUTBOX_DB_PATH,
+)
 from autocrm.outbox import OutboxRow
 
 LOG = logging.getLogger(__name__)
@@ -291,6 +298,52 @@ def _patch_page(
     return True
 
 
+def _patch_workers_from_env() -> int:
+    raw = os.environ.get("NOTION_PATCH_WORKERS", "").strip()
+    if raw:
+        try:
+            n = int(raw)
+            if n >= 1:
+                return n
+        except ValueError:
+            pass
+    return NOTION_PATCH_WORKERS
+
+
+def _apply_page_update(
+    update: PageUpdate,
+    *,
+    token: str,
+    cfg_map: Mapping[str, str],
+    cached_page: dict | None,
+    min_interval: float,
+    start_lock: threading.Lock,
+    last_start: list[float],
+) -> tuple[bool, bool, bool]:
+    """Returns (success, patched, skipped). success=False means keep outbox rows."""
+    with start_lock:
+        if min_interval > 0:
+            wait = min_interval - (time.perf_counter() - last_start[0])
+            if wait > 0:
+                time.sleep(wait)
+        last_start[0] = time.perf_counter()
+    try:
+        patched = _patch_page(
+            update.page_id,
+            update.occurred_at,
+            update.platform,
+            token,
+            cfg_map,
+            cached_page=cached_page,
+        )
+    except Exception:
+        LOG.exception("Notion update failed for page %s", update.page_id)
+        return False, False, False
+    if patched:
+        return True, True, False
+    return True, False, True
+
+
 def sync_outbox(
     db_path: Path | None = None,
     *,
@@ -333,32 +386,37 @@ def sync_outbox(
     applied = 0
     skipped = 0
     errors = 0
-    patch_s = 0.0
-    rate_limit_s = 0.0
+    workers = _patch_workers_from_env()
+    start_lock = threading.Lock()
+    last_start = [0.0]
 
     t_patch = time.perf_counter()
-    for update in updates:
-        try:
-            patched = _patch_page(
-                update.page_id,
-                update.occurred_at,
-                update.platform,
-                token,
-                cfg_map,
-                cached_page=pages_by_id.get(update.page_id),
-            )
-            delete_ids.extend(update.row_ids)
-            if patched:
-                applied += 1
-                if min_interval > 0:
-                    t_sleep = time.perf_counter()
-                    time.sleep(min_interval)
-                    rate_limit_s += time.perf_counter() - t_sleep
-            else:
-                skipped += 1
-        except Exception:
-            LOG.exception("Notion update failed for page %s", update.page_id)
-            errors += 1
+    if updates:
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            futures = {
+                pool.submit(
+                    _apply_page_update,
+                    update,
+                    token=token,
+                    cfg_map=cfg_map,
+                    cached_page=pages_by_id.get(update.page_id),
+                    min_interval=min_interval,
+                    start_lock=start_lock,
+                    last_start=last_start,
+                ): update
+                for update in updates
+            }
+            for fut in as_completed(futures):
+                update = futures[fut]
+                ok, patched, was_skipped = fut.result()
+                if ok:
+                    delete_ids.extend(update.row_ids)
+                    if patched:
+                        applied += 1
+                    elif was_skipped:
+                        skipped += 1
+                else:
+                    errors += 1
     patch_s = time.perf_counter() - t_patch
 
     t_step = time.perf_counter()
@@ -368,7 +426,7 @@ def sync_outbox(
     LOG.info(
         "Notion sync timing: %.2fs total | load_outbox=%.2fs (%d rows) | "
         "fetch_pages=%.2fs (%d pages) | plan=%.2fs (%d updates, %d unmatched) | "
-        "patch_loop=%.2fs (applied=%d skipped=%d errors=%d rate_limit_sleep=%.2fs) | "
+        "patch_loop=%.2fs (workers=%d applied=%d skipped=%d errors=%d) | "
         "delete_outbox=%.2fs",
         time.perf_counter() - t0,
         load_pending_s,
@@ -379,10 +437,10 @@ def sync_outbox(
         len(updates),
         unmatched_rows,
         patch_s,
+        workers,
         applied,
         skipped,
         errors,
-        rate_limit_s,
         delete_s,
     )
     return {"applied": applied, "errors": errors, "pending": len(pending)}
