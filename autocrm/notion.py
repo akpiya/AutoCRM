@@ -311,23 +311,32 @@ def sync_outbox(
 
     db = db_path or OUTBOX_DB_PATH
     outbox.init_db(db)
+    t0 = time.perf_counter()
 
+    t_step = time.perf_counter()
     pending = outbox.fetch_all_outbox_rows(db_path=db)
+    load_pending_s = time.perf_counter() - t_step
     if not pending:
+        LOG.info("Notion sync: no pending rows (%.2fs)", time.perf_counter() - t0)
         return {"applied": 0, "errors": 0, "pending": 0}
 
+    t_step = time.perf_counter()
     all_pages = _fetch_all_pages(db_id, token)
+    fetch_pages_s = time.perf_counter() - t_step
     pages_by_id = {p["id"]: p for p in all_pages}
-    LOG.info(
-        "Notion sync: %d outbox rows, %d pages",
-        len(pending),
-        len(all_pages),
-    )
 
+    t_step = time.perf_counter()
     updates, delete_ids = plan_page_updates(pending, all_pages, cfg_map)
-    applied = 0
-    errors = 0
+    unmatched_rows = len(delete_ids)
+    plan_s = time.perf_counter() - t_step
 
+    applied = 0
+    skipped = 0
+    errors = 0
+    patch_s = 0.0
+    rate_limit_s = 0.0
+
+    t_patch = time.perf_counter()
     for update in updates:
         try:
             patched = _patch_page(
@@ -342,10 +351,38 @@ def sync_outbox(
             if patched:
                 applied += 1
                 if min_interval > 0:
+                    t_sleep = time.perf_counter()
                     time.sleep(min_interval)
+                    rate_limit_s += time.perf_counter() - t_sleep
+            else:
+                skipped += 1
         except Exception:
             LOG.exception("Notion update failed for page %s", update.page_id)
             errors += 1
+    patch_s = time.perf_counter() - t_patch
 
+    t_step = time.perf_counter()
     outbox.delete_outbox_rows(delete_ids, db_path=db)
+    delete_s = time.perf_counter() - t_step
+
+    LOG.info(
+        "Notion sync timing: %.2fs total | load_outbox=%.2fs (%d rows) | "
+        "fetch_pages=%.2fs (%d pages) | plan=%.2fs (%d updates, %d unmatched) | "
+        "patch_loop=%.2fs (applied=%d skipped=%d errors=%d rate_limit_sleep=%.2fs) | "
+        "delete_outbox=%.2fs",
+        time.perf_counter() - t0,
+        load_pending_s,
+        len(pending),
+        fetch_pages_s,
+        len(all_pages),
+        plan_s,
+        len(updates),
+        unmatched_rows,
+        patch_s,
+        applied,
+        skipped,
+        errors,
+        rate_limit_s,
+        delete_s,
+    )
     return {"applied": applied, "errors": errors, "pending": len(pending)}
