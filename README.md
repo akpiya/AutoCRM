@@ -25,16 +25,12 @@ State lives under **`~/.autocrm/`** (outbox DB at `outbox.db`, per-source cursor
 
 ### Notion environment variables
 
-| Variable | Required | Default |
-|----------|----------|---------|
-| `NOTION_TOKEN` | Yes (for sync) | — |
-| `NOTION_DATABASE_ID` | Yes (for sync) | — |
-| `NOTION_PHONES_PROP` | No | `Phones` |
-| `NOTION_EMAILS_PROP` | No | `Emails` |
-| `NOTION_LAST_CONTACTED_PROP` | No | `Last Contacted` |
-| `NOTION_LAST_CHANNEL_PROP` | No | `Last Channel` |
-| `NOTION_MIN_INTERVAL` | No | `0.35` (seconds between page update request starts) |
-| `NOTION_PATCH_WORKERS` | No | `2` (parallel Notion page PATCH threads; default in `common.py`) |
+| Variable | Required |
+|----------|----------|
+| `NOTION_TOKEN` | Yes (for sync) |
+| `NOTION_DATABASE_ID` | Yes (for sync) |
+
+Property names, rate-limit interval, and parallel PATCH worker count live in [`autocrm/common.py`](autocrm/common.py) (`NOTION_PHONES_PROP`, `NOTION_MIN_INTERVAL`, `NOTION_PATCH_WORKERS`, etc.). Change those constants if your Notion schema differs.
 
 Unmatched outbox rows (no Notion page with that phone/email) are removed silently. **Last Contacted** only moves forward when the outbox event is newer than the value on the page.
 
@@ -56,7 +52,7 @@ Reading `~/Library/Messages/chat.db` requires **Full Disk Access** on macOS. FDA
 
 ```bash
 cp launchd/com.user.autocrm.plist.example launchd/com.user.autocrm.plist
-# Edit launchd/com.user.autocrm.plist: Python path, NOTION_* (gitignored)
+# Edit launchd/com.user.autocrm.plist: Python path, NOTION_TOKEN, NOTION_DATABASE_ID
 cp launchd/com.user.autocrm.plist ~/Library/LaunchAgents/
 launchctl unload ~/Library/LaunchAgents/com.user.autocrm.plist 2>/dev/null || true
 launchctl load ~/Library/LaunchAgents/com.user.autocrm.plist

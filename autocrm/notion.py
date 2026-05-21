@@ -20,8 +20,10 @@ from autocrm import outbox
 from autocrm.common import (
     DIRECTION_INBOUND,
     DIRECTION_OUTBOUND,
+    NOTION_MIN_INTERVAL,
     NOTION_PATCH_WORKERS,
     OUTBOX_DB_PATH,
+    notion_property_config,
 )
 from autocrm.outbox import OutboxRow
 
@@ -44,14 +46,7 @@ def load_notion_config_from_env() -> dict[str, str]:
     return {
         "NOTION_TOKEN": token,
         "NOTION_DATABASE_ID": db_id,
-        "PHONES_PROP": os.environ.get("NOTION_PHONES_PROP", "Phones"),
-        "EMAILS_PROP": os.environ.get("NOTION_EMAILS_PROP", "Emails"),
-        "LAST_CONTACTED_PROP": os.environ.get(
-            "NOTION_LAST_CONTACTED_PROP", "Last Contacted"
-        ),
-        "LAST_CHANNEL_PROP": os.environ.get(
-            "NOTION_LAST_CHANNEL_PROP", "Last Channel"
-        ),
+        **notion_property_config(),
     }
 
 
@@ -298,18 +293,6 @@ def _patch_page(
     return True
 
 
-def _patch_workers_from_env() -> int:
-    raw = os.environ.get("NOTION_PATCH_WORKERS", "").strip()
-    if raw:
-        try:
-            n = int(raw)
-            if n >= 1:
-                return n
-        except ValueError:
-            pass
-    return NOTION_PATCH_WORKERS
-
-
 def _apply_page_update(
     update: PageUpdate,
     *,
@@ -351,16 +334,11 @@ def sync_outbox(
     min_interval: float | None = None,
 ) -> dict[str, int]:
     if min_interval is None:
-        min_interval = float(os.environ.get("NOTION_MIN_INTERVAL", "0.35"))
+        min_interval = NOTION_MIN_INTERVAL
     cfg = cfg or load_notion_config_from_env()
     token = cfg["NOTION_TOKEN"]
     db_id = cfg["NOTION_DATABASE_ID"]
-    cfg_map = {
-        "PHONES_PROP": cfg["PHONES_PROP"],
-        "EMAILS_PROP": cfg["EMAILS_PROP"],
-        "LAST_CONTACTED_PROP": cfg["LAST_CONTACTED_PROP"],
-        "LAST_CHANNEL_PROP": cfg["LAST_CHANNEL_PROP"],
-    }
+    cfg_map = notion_property_config()
 
     db = db_path or OUTBOX_DB_PATH
     outbox.init_db(db)
@@ -386,7 +364,7 @@ def sync_outbox(
     applied = 0
     skipped = 0
     errors = 0
-    workers = _patch_workers_from_env()
+    workers = NOTION_PATCH_WORKERS
     start_lock = threading.Lock()
     last_start = [0.0]
 
