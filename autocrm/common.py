@@ -9,8 +9,12 @@ APPLE_EPOCH_UTC = datetime(2001, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
 
 DEFAULT_CHAT_DB_PATH = Path.home() / "Library" / "Messages" / "chat.db"
 
+DIRECTION_INBOUND = 0
 DIRECTION_OUTBOUND = 1
 PLATFORM_TEXT = "text"
+
+# Parallel Notion page PATCH workers in sync_outbox (override with NOTION_PATCH_WORKERS).
+NOTION_PATCH_WORKERS = 2
 
 def autocrm_dir() -> Path:
     d = Path.home() / ".autocrm"

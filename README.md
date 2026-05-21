@@ -33,7 +33,8 @@ State lives under **`~/.autocrm/`** (outbox DB at `outbox.db`, per-source cursor
 | `NOTION_EMAILS_PROP` | No | `Emails` |
 | `NOTION_LAST_CONTACTED_PROP` | No | `Last Contacted` |
 | `NOTION_LAST_CHANNEL_PROP` | No | `Last Channel` |
-| `NOTION_MIN_INTERVAL` | No | `0.35` (seconds between page updates) |
+| `NOTION_MIN_INTERVAL` | No | `0.35` (seconds between page update request starts) |
+| `NOTION_PATCH_WORKERS` | No | `2` (parallel Notion page PATCH threads; default in `common.py`) |
 
 Unmatched outbox rows (no Notion page with that phone/email) are removed silently. **Last Contacted** only moves forward when the outbox event is newer than the value on the page.
 

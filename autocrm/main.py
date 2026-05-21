@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 
 from autocrm import notion
 from autocrm.collectors.beeper import BeeperCollector
@@ -20,10 +21,12 @@ def run() -> None:
     for c in collectors:
         try:
             log.info("Collector start: %s", c.app)
+            t0 = time.perf_counter()
             result = c.collect()
             log.info(
-                "Collector done: %s (enqueued=%s cursor_before=%s cursor_after=%s)",
+                "Collector done: %s in %.2fs (enqueued=%s cursor_before=%s cursor_after=%s)",
                 c.app,
+                time.perf_counter() - t0,
                 result.enqueued,
                 result.cursor_before,
                 result.cursor_after,
@@ -35,9 +38,12 @@ def run() -> None:
     if notion.notion_configured():
         try:
             log.info("Notion sync start")
+            t0 = time.perf_counter()
             stats = notion.sync_outbox()
             log.info(
-                "Notion sync done: applied=%s errors=%s",
+                "Notion sync done in %.2fs (pending=%s applied=%s errors=%s)",
+                time.perf_counter() - t0,
+                stats.get("pending", 0),
                 stats["applied"],
                 stats["errors"],
             )

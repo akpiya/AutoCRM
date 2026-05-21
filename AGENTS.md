@@ -82,9 +82,11 @@ Use `db_path=OUTBOX_DB_PATH` from `autocrm.common` unless testing with a temp DB
 ### iMessage (`imessage`)
 
 - DB: `~/Library/Messages/chat.db` (read-only URI: `file:...?mode=ro`). Query logic in `collectors/imessage_db.py`.
-- Outbound filter: `message.is_from_me = 1`.
+- Ingest **inbound and outbound** messages after the cursor (`message` → `chat_message_join` → `chat`).
+- **Group chats** (`chat_identifier` or `guid` contains `;+;`): outbound fans out to every handle in `chat_handle_join`; inbound credits the sender only.
+- **1:1 chats**: one outbox row per message; `party_id` is the other party’s handle (`handle.id`).
 - `message.date` is **nanoseconds since 2001-01-01 UTC** (Apple epoch). Convert with `apple_ns_to_unix` in `common.py`.
-- Outbox rows use `platform="text"` for all SMS/iMessage (`PLATFORM_TEXT`); `direction=1` (`DIRECTION_OUTBOUND`).
+- Outbox rows use `platform="text"` (`PLATFORM_TEXT`); `direction` is `DIRECTION_INBOUND` (0) or `DIRECTION_OUTBOUND` (1).
 - Cursor: max `message.ROWID` processed, stored via `outbox.ingest_outbox_batch` in the same transaction as event inserts.
 - If no ingest cursor exists yet, skip ingest and set cursor to `MAX(ROWID)` in `chat.db` (no historical backfill).
 - No dedupe key; duplicate outbox rows on retry are acceptable.
@@ -106,7 +108,9 @@ Use `db_path=OUTBOX_DB_PATH` from `autocrm.common` unless testing with a temp DB
 
 - Runs automatically at end of `main.py` when `notion_configured()`.
 - Match `party_id` to Notion **Phones** / **Emails** (phone if no `@`, else email). Phones match across `+1`, parentheses, hyphens, and 10- vs 11-digit US forms.
-- Group pending rows by matched page; PATCH with max `created_at` and `platform` as Last Channel.
+- Apply updates for both inbound and outbound outbox rows (monotonic **Last Contacted**).
+- Plan updates across **all** pending outbox rows, then at most **one PATCH per Notion page** per run (group fan-out does not multiply API calls).
+- Use the database query snapshot for Last Contacted when possible (skip per-page GET). Page PATCHes run on `NOTION_PATCH_WORKERS` threads (default `2` in `common.py`; env `NOTION_PATCH_WORKERS`). Stagger request starts with `NOTION_MIN_INTERVAL` (default `0.35` s).
 - Unmatched rows: delete from outbox silently (no log).
 - Notion API errors: leave affected rows in outbox for retry; exit non-zero if `errors > 0`.
 
