@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from autocrm import notion
-from autocrm.common import DIRECTION_OUTBOUND, PLATFORM_TEXT
+from autocrm.common import DIRECTION_INBOUND, DIRECTION_OUTBOUND, PLATFORM_TEXT
 from autocrm.outbox import OutboxRow
 
 
@@ -59,6 +59,20 @@ def test_phone_match_variants_us_ten_and_eleven() -> None:
 def test_match_page_for_party_email() -> None:
     pages = [_page("p2", [], ["friend@example.com"])]
     assert notion.match_page_for_party("friend@example.com", pages, CFG) == "p2"
+
+
+def test_plan_page_updates_includes_inbound() -> None:
+    pages = [_page("p1", ["+15551234567"], [])]
+    rows = [
+        OutboxRow(1, PLATFORM_TEXT, "+15551234567", DIRECTION_INBOUND, 100.0),
+        OutboxRow(2, PLATFORM_TEXT, "+15551234567", DIRECTION_OUTBOUND, 50.0),
+    ]
+    updates, delete_ids = notion.plan_page_updates(rows, pages, CFG)
+
+    assert delete_ids == []
+    assert len(updates) == 1
+    assert updates[0].page_id == "p1"
+    assert updates[0].occurred_at.timestamp() == 100.0
 
 
 def test_plan_page_updates_groups_and_drops_unmatched() -> None:

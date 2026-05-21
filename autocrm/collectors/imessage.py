@@ -8,13 +8,41 @@ from pathlib import Path
 from autocrm import outbox
 from autocrm.common import (
     DEFAULT_CHAT_DB_PATH,
+    DIRECTION_INBOUND,
     DIRECTION_OUTBOUND,
     OUTBOX_DB_PATH,
     PLATFORM_TEXT,
     apple_ns_to_unix,
 )
 from autocrm.collectors.collector import Collector, CollectResult
-from autocrm.collectors.imessage_db import fetch_outbound_messages, max_message_rowid
+from autocrm.collectors.imessage_db import (
+    MessageRow,
+    fetch_messages_after_rowid,
+    max_message_rowid,
+)
+
+
+def _events_for_message(row: MessageRow) -> list[outbox.EventTuple]:
+    created_at = apple_ns_to_unix(row.mdate)
+    if created_at is None:
+        return []
+
+    if row.is_group:
+        if row.is_from_me:
+            return [
+                (PLATFORM_TEXT, handle, DIRECTION_OUTBOUND, created_at)
+                for handle in row.member_handles
+            ]
+        if row.sender_handle:
+            return [
+                (PLATFORM_TEXT, row.sender_handle, DIRECTION_INBOUND, created_at),
+            ]
+        return []
+
+    if not row.sender_handle:
+        return []
+    direction = DIRECTION_OUTBOUND if row.is_from_me else DIRECTION_INBOUND
+    return [(PLATFORM_TEXT, row.sender_handle, direction, created_at)]
 
 
 @dataclass
@@ -41,20 +69,13 @@ class IMessageCollector(Collector):
             )
 
         last_row = int(cursor_before)
-        rows = fetch_outbound_messages(self.chat_db_path, last_row)
+        rows = fetch_messages_after_rowid(self.chat_db_path, last_row)
         max_row = last_row
         events: list[outbox.EventTuple] = []
 
         for row in rows:
             max_row = max(max_row, row.rowid)
-            if not row.handle_id:
-                continue
-            created_at = apple_ns_to_unix(row.mdate)
-            if created_at is None:
-                continue
-            events.append(
-                (PLATFORM_TEXT, row.handle_id, DIRECTION_OUTBOUND, created_at)
-            )
+            events.extend(_events_for_message(row))
 
         enqueued = 0
         if max_row > last_row or events:

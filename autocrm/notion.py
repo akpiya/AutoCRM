@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from autocrm import outbox
-from autocrm.common import DIRECTION_OUTBOUND, OUTBOX_DB_PATH
+from autocrm.common import DIRECTION_INBOUND, DIRECTION_OUTBOUND, OUTBOX_DB_PATH
 from autocrm.outbox import OutboxRow
 
 LOG = logging.getLogger(__name__)
@@ -118,7 +118,7 @@ def plan_page_updates(
     by_page_rows: dict[str, list[OutboxRow]] = defaultdict(list)
 
     for row in rows:
-        if row.direction != DIRECTION_OUTBOUND:
+        if row.direction not in (DIRECTION_INBOUND, DIRECTION_OUTBOUND):
             delete_ids.append(row.id)
             continue
         page_id = match_page_for_party(row.party_id, pages, cfg_map)

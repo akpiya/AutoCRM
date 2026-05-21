@@ -9,6 +9,7 @@ APPLE_EPOCH_UTC = datetime(2001, 1, 1, 0, 0, 0, tzinfo=timezone.utc)
 
 DEFAULT_CHAT_DB_PATH = Path.home() / "Library" / "Messages" / "chat.db"
 
+DIRECTION_INBOUND = 0
 DIRECTION_OUTBOUND = 1
 PLATFORM_TEXT = "text"
 
