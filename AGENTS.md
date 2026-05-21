@@ -86,6 +86,7 @@ Use `db_path=OUTBOX_DB_PATH` from `autocrm.common` unless testing with a temp DB
 - `message.date` is **nanoseconds since 2001-01-01 UTC** (Apple epoch). Convert with `apple_ns_to_unix` in `common.py`.
 - Outbox rows use `platform="text"` for all SMS/iMessage (`PLATFORM_TEXT`); `direction=1` (`DIRECTION_OUTBOUND`).
 - Cursor: max `message.ROWID` processed, stored via `outbox.ingest_outbox_batch` in the same transaction as event inserts.
+- If no ingest cursor exists yet, skip ingest and set cursor to `MAX(ROWID)` in `chat.db` (no historical backfill).
 - No dedupe key; duplicate outbox rows on retry are acceptable.
 - macOS may require **Full Disk Access** for Terminal/Python to read `chat.db`.
 

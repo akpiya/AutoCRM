@@ -22,6 +22,10 @@ def outbox_db_path(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def collector(chat_db_path: Path, outbox_db_path: Path) -> IMessageCollector:
+    from autocrm import outbox
+
+    outbox.init_db(outbox_db_path)
+    outbox.ingest_outbox_batch("imessage", [], 0.0, db_path=outbox_db_path)
     return IMessageCollector(
         chat_db_path=chat_db_path,
         outbox_db_path=outbox_db_path,

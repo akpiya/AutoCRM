@@ -14,7 +14,7 @@ from autocrm.common import (
     apple_ns_to_unix,
 )
 from autocrm.collectors.collector import Collector, CollectResult
-from autocrm.collectors.imessage_db import MessageRow, fetch_outbound_messages
+from autocrm.collectors.imessage_db import fetch_outbound_messages, max_message_rowid
 
 
 @dataclass
@@ -28,8 +28,19 @@ class IMessageCollector(Collector):
             raise FileNotFoundError(f"chat.db not found: {self.chat_db_path}")
 
         cursor_before = outbox.get_cursor(self.app, db_path=self.outbox_db_path)
-        last_row = int(cursor_before or 0)
+        if cursor_before is None:
+            max_row = max_message_rowid(self.chat_db_path)
+            outbox.ingest_outbox_batch(
+                self.app, [], float(max_row), db_path=self.outbox_db_path
+            )
+            return CollectResult(
+                source=self.app,
+                enqueued=0,
+                cursor_before=None,
+                cursor_after=max_row,
+            )
 
+        last_row = int(cursor_before)
         rows = fetch_outbound_messages(self.chat_db_path, last_row)
         max_row = last_row
         events: list[outbox.EventTuple] = []
