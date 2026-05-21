@@ -20,6 +20,7 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
+from autocrm.common import NOTION_NAME_PROP
 from autocrm.notion import load_notion_config_from_env
 
 
@@ -84,14 +85,13 @@ def create_people_page(
     *,
     cfg: dict[str, str],
 ) -> str:
-    name_prop = os.environ.get("NOTION_NAME_PROP", "Name")
     phones_prop = cfg["PHONES_PROP"]
     emails_prop = cfg["EMAILS_PROP"]
     token = cfg["NOTION_TOKEN"]
     db_id = cfg["NOTION_DATABASE_ID"]
 
     properties: dict = {
-        name_prop: {
+        NOTION_NAME_PROP: {
             "title": [{"type": "text", "text": {"content": name[:2000]}}],
         },
     }
