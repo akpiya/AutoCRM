@@ -15,11 +15,15 @@
   <dict>
     <key>PATH</key>
     <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <key>AUTOCRM_NOTION_TOKEN</key>
+    <string>REPLACE_WITH_NOTION_INTEGRATION_SECRET</string>
+    <key>AUTOCRM_NOTION_DATABASE_ID</key>
+    <string>REPLACE_WITH_NOTION_DATABASE_ID</string>
   </dict>
 
   <key>ProgramArguments</key>
   <array>
-    <string>/usr/bin/python3</string>
+    <string>/REPLACE/WITH/path/to/autocrm/.venv/bin/python3</string>
     <string>-m</string>
     <string>autocrm.main</string>
   </array>

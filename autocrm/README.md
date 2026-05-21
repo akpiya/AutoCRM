@@ -1,13 +1,14 @@
 # `autocrm` package
 
-Collectors read outbound activity from local sources and append rows to a SQLite outbox at `~/.autocrm/outbox.db`. Notion sync is out of scope for now.
+Collectors read outbound activity from local sources and append rows to a SQLite outbox at `~/.autocrm/outbox.db`. `main.py` runs `notion.sync_outbox()` after collectors when Notion env vars are set.
 
 ## Layout
 
 | Module | Role |
 |--------|------|
 | **`main.py`** | Entrypoint: run collectors serially (iMessage → phone → Beeper). |
-| **`outbox.py`** | SQLite outbox + per-source cursors. |
+| **`outbox.py`** | SQLite outbox + ingest cursors + sync queue helpers. |
+| **`notion.py`** | Match `party_id` to Notion pages; update Last Contacted / Last Channel. |
 | **`common.py`** | Paths, Apple epoch conversion, `PLATFORM_TEXT`, `DIRECTION_OUTBOUND`. |
 | **`collectors/collector.py`** | `Collector` interface and `CollectResult`. |
 | **`collectors/imessage_db.py`** | Query outbound rows from `chat.db`. |

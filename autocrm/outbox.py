@@ -4,12 +4,22 @@ from __future__ import annotations
 
 import sqlite3
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Sequence
 
 from autocrm.common import OUTBOX_DB_PATH
 
 EventTuple = tuple[str, str, int, float]
+
+
+@dataclass(frozen=True)
+class OutboxRow:
+    id: int
+    platform: str
+    party_id: str
+    direction: int
+    created_at: float
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS outbox (
@@ -80,5 +90,52 @@ def ingest_outbox_batch(
         )
         conn.commit()
         return len(events)
+    finally:
+        conn.close()
+
+
+def fetch_outbox_batch(
+    limit: int,
+    *,
+    db_path: Path = OUTBOX_DB_PATH,
+) -> list[OutboxRow]:
+    init_db(db_path)
+    conn = sqlite3.connect(db_path)
+    try:
+        rows = conn.execute(
+            "SELECT id, platform, party_id, direction, created_at "
+            "FROM outbox ORDER BY id LIMIT ?",
+            (limit,),
+        ).fetchall()
+    finally:
+        conn.close()
+    return [
+        OutboxRow(
+            id=int(r[0]),
+            platform=str(r[1]),
+            party_id=str(r[2]),
+            direction=int(r[3]),
+            created_at=float(r[4]),
+        )
+        for r in rows
+    ]
+
+
+def delete_outbox_rows(
+    row_ids: Sequence[int],
+    *,
+    db_path: Path = OUTBOX_DB_PATH,
+) -> None:
+    if not row_ids:
+        return
+    init_db(db_path)
+    conn = sqlite3.connect(db_path)
+    try:
+        placeholders = ",".join("?" * len(row_ids))
+        conn.execute(
+            f"DELETE FROM outbox WHERE id IN ({placeholders})",
+            list(row_ids),
+        )
+        conn.commit()
     finally:
         conn.close()

@@ -1,32 +1,31 @@
 # AutoCRM — agent instructions
 
-AutoCRM is a **macOS-only** Python tool that records **outbound** communication activity (iMessage/SMS, phone/FaceTime calls, Beeper Desktop) into a local SQLite **outbox**. A future phase may sync the outbox to a CRM (e.g. Notion); **that sync is out of scope** until local ingest is solid.
+AutoCRM is a **macOS-only** Python tool that records **outbound** communication activity (iMessage/SMS, phone/FaceTime calls, Beeper Desktop) into a local SQLite **outbox**, then syncs to a Notion people database when configured.
 
 This file is the shared briefing for Cursor Agent sessions. Prefer updating it when architecture or milestones change rather than re-explaining the project in chat.
 
 ## Current milestone
 
-**Reliable local ingest:** collectors run on a schedule, read only new outbound events from each source, write rows to `~/.autocrm/outbox.db`, and advance per-source cursors without duplicates or gaps.
-
-Collectors are **stubs** today (`enqueued=0`). Implement them incrementally; keep `python3 -m autocrm.main` working after each change.
+**Ingest + Notion sync:** collectors write the outbox and advance ingest cursors; `main.py` then runs `notion.sync_outbox()` if `AUTOCRM_NOTION_TOKEN` and `AUTOCRM_NOTION_DATABASE_ID` are set. Phone and Beeper collectors are still stubs.
 
 ## Repository layout
 
 | Path | Role |
 |------|------|
-| `autocrm/main.py` | Entrypoint: run collectors serially; log results; exit non-zero if any collector fails. |
-| `autocrm/outbox.py` | SQLite schema, event insert/delete, cursor read/write. |
+| `autocrm/main.py` | Collectors, then Notion sync when configured. |
+| `autocrm/outbox.py` | Outbox schema, ingest batch, sync queue fetch/delete. |
+| `autocrm/notion.py` | Notion API + drain outbox (stdlib HTTP). |
 | `autocrm/common.py` | `~/.autocrm` paths (`OUTBOX_DB_PATH`). |
 | `autocrm/collectors/collector.py` | `Collector` ABC and `CollectResult` dataclass. |
 | `autocrm/collectors/imessage.py` | iMessage collector → outbox. |
 | `autocrm/collectors/imessage_db.py` | Read outbound rows from `chat.db`. |
 | `autocrm/collectors/phone.py` | Call history — read `CallHistory.storedata`. |
 | `autocrm/collectors/beeper.py` | Beeper Desktop local API. |
-| `launchd/com.user.autocrm.plist` | Example LaunchAgent: `python3 -m autocrm.main` every 120s. |
+| `launchd/com.user.autocrm.plist.example` | LaunchAgent template; real `com.user.autocrm.plist` is gitignored. |
 | `scripts/e2e_verify.sh` | Install editable package, pytest (if any), run main. |
 | `README.md`, `autocrm/README.md` | Human-oriented docs; keep in sync with behavior. |
 
-There is **no** `tests/` tree yet; `pyproject.toml` points pytest at `tests/` when added.
+Tests under `tests/`; run `pytest` from repo root.
 
 ## Runtime and setup
 
@@ -39,10 +38,11 @@ There is **no** `tests/` tree yet; `pyproject.toml` points pytest at `tests/` wh
 ## Architecture
 
 ```text
-launchd (every 2m)  →  autocrm.main  →  [IMessage, Phone, Beeper] collectors
-                                              ↓
-                                    outbox.py (SQLite)
-                              ~/.autocrm/outbox.db
+launchd → autocrm.main → collectors → outbox table
+                              ↓
+                    notion.sync_outbox (if env set)
+                              ↓
+                         Notion people DB
 ```
 
 - Collectors run **serially** in fixed order: iMessage → phone → Beeper (`main.py`).
@@ -61,8 +61,12 @@ Tables (see `autocrm/outbox.py`):
 | Function | Purpose |
 |----------|---------|
 | `get_cursor(source)` | Read ingest checkpoint for a collector |
-| `ingest_outbox_batch(source, events, cursor_value)` | Insert outbox rows and update cursor in one transaction |
+| `ingest_outbox_batch(source, events, cursor_value)` | Insert outbox rows and update ingest cursor in one transaction |
+| `fetch_outbox_batch(limit)` | Read pending sync rows (FIFO by `id`) |
+| `delete_outbox_rows(ids)` | Remove processed rows from the sync queue |
 | `init_db` | Create tables if missing (called internally) |
+
+The **`outbox` table** is the pending Notion sync queue. Rows are deleted after sync (matched or unmatched). Ingest cursors live in the **`cursor`** table.
 
 Collectors should:
 
@@ -97,6 +101,14 @@ Use `db_path=OUTBOX_DB_PATH` from `autocrm.common` unless testing with a temp DB
 - Use Beeper Desktop’s **local** API; persist cursor in SQLite (not a separate JSON file unless you have a good reason).
 - Map chats to `party_id` / platform fields consistently with other collectors.
 
+### Notion sync (`notion.py`)
+
+- Runs automatically at end of `main.py` when `notion_configured()`.
+- Match `party_id` to Notion **Phones** / **Emails** (phone if no `@`, else email). Phones match across `+1`, parentheses, hyphens, and 10- vs 11-digit US forms.
+- Group pending rows by matched page; PATCH with max `created_at` and `platform` as Last Channel.
+- Unmatched rows: delete from outbox silently (no log).
+- Notion API errors: leave affected rows in outbox for retry; exit non-zero if `errors > 0`.
+
 ## Code style
 
 Readability over cleverness. Prefer simple, linear code that a future reader can follow without hunting through abstractions.
@@ -123,7 +135,7 @@ Readability over cleverness. Prefer simple, linear code that a future reader can
 **Changes**
 
 - Keep diffs scoped (one collector or one concern at a time).
-- Do not reintroduce large subsystems (e.g. Notion sync, rich JSON event blobs) unless explicitly requested.
+- Do not reintroduce V0-style JSON payload outbox blobs unless explicitly requested.
 - `CollectResult` fields: `source`, `enqueued`, optional `cursor_before` / `cursor_after` for observability.
 
 ## What not to do unless asked

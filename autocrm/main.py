@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 
+from autocrm import notion
 from autocrm.collectors.beeper import BeeperCollector
 from autocrm.collectors.imessage import IMessageCollector
 from autocrm.collectors.phone import PhoneCallsCollector
@@ -30,6 +31,21 @@ def run() -> None:
         except Exception:
             failures.append(c.app)
             log.exception("Collector failed: %s", c.app)
+
+    if notion.notion_configured():
+        try:
+            log.info("Notion sync start")
+            stats = notion.sync_outbox()
+            log.info(
+                "Notion sync done: applied=%s errors=%s",
+                stats["applied"],
+                stats["errors"],
+            )
+            if stats["errors"]:
+                failures.append("notion")
+        except Exception:
+            failures.append("notion")
+            log.exception("Notion sync failed")
 
     if failures:
         raise SystemExit(
