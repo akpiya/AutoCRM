@@ -264,16 +264,21 @@ def _patch_page(
     platform: str,
     token: str,
     cfg_map: Mapping[str, str],
-) -> None:
+    *,
+    cached_page: dict | None = None,
+) -> bool:
+    """PATCH Last Contacted / Last Channel. Returns True if a PATCH was sent."""
     last_prop = cfg_map["LAST_CONTACTED_PROP"]
     chan_prop = cfg_map["LAST_CHANNEL_PROP"]
     url = f"https://api.notion.com/v1/pages/{page_id}"
-    page = _notion_request("GET", url, token)
-    props = page.get("properties") or {}
+    props = (cached_page or {}).get("properties") or {}
+    if not props:
+        page = _notion_request("GET", url, token)
+        props = page.get("properties") or {}
     current = _parse_notion_datetime(props.get(last_prop))
     occ = occurred_at.astimezone(timezone.utc)
     if current is not None and occ < current:
-        return
+        return False
     body = {
         "properties": {
             last_prop: {
@@ -283,6 +288,7 @@ def _patch_page(
         }
     }
     _notion_request("PATCH", url, token, body)
+    return True
 
 
 def sync_outbox(
@@ -290,7 +296,6 @@ def sync_outbox(
     *,
     cfg: dict[str, str] | None = None,
     min_interval: float | None = None,
-    batch_size: int = 50,
 ) -> dict[str, int]:
     if min_interval is None:
         min_interval = float(os.environ.get("NOTION_MIN_INTERVAL", "0.35"))
@@ -307,35 +312,40 @@ def sync_outbox(
     db = db_path or OUTBOX_DB_PATH
     outbox.init_db(db)
 
-    all_pages = _fetch_all_pages(db_id, token)
-    LOG.info("Notion sync: loaded %d pages", len(all_pages))
+    pending = outbox.fetch_all_outbox_rows(db_path=db)
+    if not pending:
+        return {"applied": 0, "errors": 0, "pending": 0}
 
+    all_pages = _fetch_all_pages(db_id, token)
+    pages_by_id = {p["id"]: p for p in all_pages}
+    LOG.info(
+        "Notion sync: %d outbox rows, %d pages",
+        len(pending),
+        len(all_pages),
+    )
+
+    updates, delete_ids = plan_page_updates(pending, all_pages, cfg_map)
     applied = 0
     errors = 0
 
-    while True:
-        batch = outbox.fetch_outbox_batch(batch_size, db_path=db)
-        if not batch:
-            break
-
-        updates, delete_ids = plan_page_updates(batch, all_pages, cfg_map)
-
-        for update in updates:
-            try:
-                _patch_page(
-                    update.page_id,
-                    update.occurred_at,
-                    update.platform,
-                    token,
-                    cfg_map,
-                )
-                delete_ids.extend(update.row_ids)
+    for update in updates:
+        try:
+            patched = _patch_page(
+                update.page_id,
+                update.occurred_at,
+                update.platform,
+                token,
+                cfg_map,
+                cached_page=pages_by_id.get(update.page_id),
+            )
+            delete_ids.extend(update.row_ids)
+            if patched:
                 applied += 1
-                time.sleep(min_interval)
-            except Exception:
-                LOG.exception("Notion update failed for page %s", update.page_id)
-                errors += 1
+                if min_interval > 0:
+                    time.sleep(min_interval)
+        except Exception:
+            LOG.exception("Notion update failed for page %s", update.page_id)
+            errors += 1
 
-        outbox.delete_outbox_rows(delete_ids, db_path=db)
-
-    return {"applied": applied, "errors": errors}
+    outbox.delete_outbox_rows(delete_ids, db_path=db)
+    return {"applied": applied, "errors": errors, "pending": len(pending)}

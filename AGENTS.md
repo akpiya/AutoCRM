@@ -109,7 +109,8 @@ Use `db_path=OUTBOX_DB_PATH` from `autocrm.common` unless testing with a temp DB
 - Runs automatically at end of `main.py` when `notion_configured()`.
 - Match `party_id` to Notion **Phones** / **Emails** (phone if no `@`, else email). Phones match across `+1`, parentheses, hyphens, and 10- vs 11-digit US forms.
 - Apply updates for both inbound and outbound outbox rows (monotonic **Last Contacted**).
-- Group pending rows by matched page; PATCH with max `created_at` and `platform` as Last Channel.
+- Plan updates across **all** pending outbox rows, then at most **one PATCH per Notion page** per run (group fan-out does not multiply API calls).
+- Use the database query snapshot for Last Contacted when possible (skip per-page GET). Rate-limit with `NOTION_MIN_INTERVAL` (default `0.35` s) only when a PATCH is sent.
 - Unmatched rows: delete from outbox silently (no log).
 - Notion API errors: leave affected rows in outbox for retry; exit non-zero if `errors > 0`.
 

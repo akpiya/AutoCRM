@@ -94,6 +94,28 @@ def ingest_outbox_batch(
         conn.close()
 
 
+def fetch_all_outbox_rows(*, db_path: Path = OUTBOX_DB_PATH) -> list[OutboxRow]:
+    init_db(db_path)
+    conn = sqlite3.connect(db_path)
+    try:
+        rows = conn.execute(
+            "SELECT id, platform, party_id, direction, created_at "
+            "FROM outbox ORDER BY id"
+        ).fetchall()
+    finally:
+        conn.close()
+    return [
+        OutboxRow(
+            id=int(r[0]),
+            platform=str(r[1]),
+            party_id=str(r[2]),
+            direction=int(r[3]),
+            created_at=float(r[4]),
+        )
+        for r in rows
+    ]
+
+
 def fetch_outbox_batch(
     limit: int,
     *,

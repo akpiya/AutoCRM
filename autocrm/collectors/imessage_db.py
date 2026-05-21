@@ -29,32 +29,40 @@ def max_message_rowid(chat_db: Path) -> int:
     return int(row[0])
 
 
-def _fetch_member_handles(conn: sqlite3.Connection, chat_id: int) -> tuple[str, ...]:
+def _member_handles_for_chats(
+    conn: sqlite3.Connection, chat_ids: set[int]
+) -> dict[int, tuple[str, ...]]:
+    if not chat_ids:
+        return {}
+    placeholders = ",".join("?" * len(chat_ids))
     rows = conn.execute(
-        """
-        SELECT h.id
+        f"""
+        SELECT chj.chat_id, h.id
         FROM chat_handle_join chj
         JOIN handle h ON h.ROWID = chj.handle_id
-        WHERE chj.chat_id = ?
-        ORDER BY h.id
+        WHERE chj.chat_id IN ({placeholders})
+        ORDER BY chj.chat_id, h.id
         """,
-        (chat_id,),
+        list(chat_ids),
     ).fetchall()
-    seen: set[str] = set()
-    out: list[str] = []
-    for (raw,) in rows:
+    buckets: dict[int, list[str]] = {}
+    seen: dict[int, set[str]] = {}
+    for chat_id, raw in rows:
         handle = (raw or "").strip()
-        if handle and handle not in seen:
-            seen.add(handle)
-            out.append(handle)
-    return tuple(out)
+        if not handle:
+            continue
+        cid = int(chat_id)
+        if handle in seen.setdefault(cid, set()):
+            continue
+        seen[cid].add(handle)
+        buckets.setdefault(cid, []).append(handle)
+    return {cid: tuple(handles) for cid, handles in buckets.items()}
 
 
 def fetch_messages_after_rowid(chat_db: Path, after_rowid: int) -> list[MessageRow]:
     uri = f"file:{chat_db}?mode=ro"
     conn = sqlite3.connect(uri, uri=True)
     conn.row_factory = sqlite3.Row
-    member_cache: dict[int, tuple[str, ...]] = {}
     try:
         rows = conn.execute(
             """
@@ -80,15 +88,16 @@ def fetch_messages_after_rowid(chat_db: Path, after_rowid: int) -> list[MessageR
             (after_rowid,),
         ).fetchall()
 
+        group_chat_ids = {
+            int(r["chat_id"]) for r in rows if bool(r["is_group"])
+        }
+        member_cache = _member_handles_for_chats(conn, group_chat_ids)
+
         result: list[MessageRow] = []
         for r in rows:
             chat_id = int(r["chat_id"])
             is_group = bool(r["is_group"])
-            members: tuple[str, ...] = ()
-            if is_group:
-                if chat_id not in member_cache:
-                    member_cache[chat_id] = _fetch_member_handles(conn, chat_id)
-                members = member_cache[chat_id]
+            members = member_cache.get(chat_id, ()) if is_group else ()
             result.append(
                 MessageRow(
                     rowid=int(r["rowid"]),
