@@ -6,7 +6,7 @@ This file is the shared briefing for Cursor Agent sessions. Prefer updating it w
 
 ## Current milestone
 
-**Ingest + Notion sync:** collectors write the outbox and advance ingest cursors; `main.py` then runs `notion.sync_outbox()` if `AUTOCRM_NOTION_TOKEN` and `AUTOCRM_NOTION_DATABASE_ID` are set. Phone and Beeper collectors are still stubs.
+**Ingest + Notion sync:** collectors write the outbox and advance ingest cursors; `main.py` then runs `notion.sync_outbox()` if `NOTION_TOKEN` and `NOTION_DATABASE_ID` are set. Phone and Beeper collectors are still stubs.
 
 ## Repository layout
 

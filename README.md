@@ -14,8 +14,8 @@ AutoCRM records outbound communication activity on your Mac into a local SQLite 
 
 ```bash
 python -m pip install -e ".[dev]"
-export AUTOCRM_NOTION_TOKEN="secret_..."
-export AUTOCRM_NOTION_DATABASE_ID="your-database-id"
+export NOTION_TOKEN="secret_..."
+export NOTION_DATABASE_ID="your-database-id"
 python3 -m autocrm.main
 ```
 
@@ -27,13 +27,13 @@ State lives under **`~/.autocrm/`** (outbox DB at `outbox.db`, per-source cursor
 
 | Variable | Required | Default |
 |----------|----------|---------|
-| `AUTOCRM_NOTION_TOKEN` | Yes (for sync) | — |
-| `AUTOCRM_NOTION_DATABASE_ID` | Yes (for sync) | — |
-| `AUTOCRM_NOTION_PHONES_PROP` | No | `Phones` |
-| `AUTOCRM_NOTION_EMAILS_PROP` | No | `Emails` |
-| `AUTOCRM_NOTION_LAST_CONTACTED_PROP` | No | `Last Contacted` |
-| `AUTOCRM_NOTION_LAST_CHANNEL_PROP` | No | `Last Channel` |
-| `AUTOCRM_NOTION_MIN_INTERVAL` | No | `0.35` (seconds between page updates) |
+| `NOTION_TOKEN` | Yes (for sync) | — |
+| `NOTION_DATABASE_ID` | Yes (for sync) | — |
+| `NOTION_PHONES_PROP` | No | `Phones` |
+| `NOTION_EMAILS_PROP` | No | `Emails` |
+| `NOTION_LAST_CONTACTED_PROP` | No | `Last Contacted` |
+| `NOTION_LAST_CHANNEL_PROP` | No | `Last Channel` |
+| `NOTION_MIN_INTERVAL` | No | `0.35` (seconds between page updates) |
 
 Unmatched outbox rows (no Notion page with that phone/email) are removed silently. **Last Contacted** only moves forward when the outbox event is newer than the value on the page.
 
@@ -55,7 +55,7 @@ Reading `~/Library/Messages/chat.db` requires **Full Disk Access** on macOS. FDA
 
 ```bash
 cp launchd/com.user.autocrm.plist.example launchd/com.user.autocrm.plist
-# Edit launchd/com.user.autocrm.plist: Python path, AUTOCRM_NOTION_* (gitignored)
+# Edit launchd/com.user.autocrm.plist: Python path, NOTION_* (gitignored)
 cp launchd/com.user.autocrm.plist ~/Library/LaunchAgents/
 launchctl unload ~/Library/LaunchAgents/com.user.autocrm.plist 2>/dev/null || true
 launchctl load ~/Library/LaunchAgents/com.user.autocrm.plist

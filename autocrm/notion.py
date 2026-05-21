@@ -22,28 +22,28 @@ LOG = logging.getLogger(__name__)
 
 
 def notion_configured() -> bool:
-    token = os.environ.get("AUTOCRM_NOTION_TOKEN", "").strip()
-    db_id = os.environ.get("AUTOCRM_NOTION_DATABASE_ID", "").strip()
+    token = os.environ.get("NOTION_TOKEN", "").strip()
+    db_id = os.environ.get("NOTION_DATABASE_ID", "").strip()
     return bool(token and db_id)
 
 
 def load_notion_config_from_env() -> dict[str, str]:
-    token = os.environ.get("AUTOCRM_NOTION_TOKEN", "").strip()
-    db_id = os.environ.get("AUTOCRM_NOTION_DATABASE_ID", "").strip()
+    token = os.environ.get("NOTION_TOKEN", "").strip()
+    db_id = os.environ.get("NOTION_DATABASE_ID", "").strip()
     if not token or not db_id:
         raise RuntimeError(
-            "Set AUTOCRM_NOTION_TOKEN and AUTOCRM_NOTION_DATABASE_ID"
+            "Set NOTION_TOKEN and NOTION_DATABASE_ID"
         )
     return {
         "NOTION_TOKEN": token,
         "NOTION_DATABASE_ID": db_id,
-        "PHONES_PROP": os.environ.get("AUTOCRM_NOTION_PHONES_PROP", "Phones"),
-        "EMAILS_PROP": os.environ.get("AUTOCRM_NOTION_EMAILS_PROP", "Emails"),
+        "PHONES_PROP": os.environ.get("NOTION_PHONES_PROP", "Phones"),
+        "EMAILS_PROP": os.environ.get("NOTION_EMAILS_PROP", "Emails"),
         "LAST_CONTACTED_PROP": os.environ.get(
-            "AUTOCRM_NOTION_LAST_CONTACTED_PROP", "Last Contacted"
+            "NOTION_LAST_CONTACTED_PROP", "Last Contacted"
         ),
         "LAST_CHANNEL_PROP": os.environ.get(
-            "AUTOCRM_NOTION_LAST_CHANNEL_PROP", "Last Channel"
+            "NOTION_LAST_CHANNEL_PROP", "Last Channel"
         ),
     }
 
@@ -293,7 +293,7 @@ def sync_outbox(
     batch_size: int = 50,
 ) -> dict[str, int]:
     if min_interval is None:
-        min_interval = float(os.environ.get("AUTOCRM_NOTION_MIN_INTERVAL", "0.35"))
+        min_interval = float(os.environ.get("NOTION_MIN_INTERVAL", "0.35"))
     cfg = cfg or load_notion_config_from_env()
     token = cfg["NOTION_TOKEN"]
     db_id = cfg["NOTION_DATABASE_ID"]
