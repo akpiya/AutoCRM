@@ -2,7 +2,7 @@
 """
 Import contacts from a vCard (.vcf) into the Notion people database.
 
-Requires AUTOCRM_NOTION_TOKEN and AUTOCRM_NOTION_DATABASE_ID (same as autocrm.main).
+Requires NOTION_TOKEN and NOTION_DATABASE_ID (same as autocrm.main).
 
 Usage (from repo root, package installed):
 
@@ -32,10 +32,10 @@ class VCardContact:
 
 def ensure_notion_env() -> dict[str, str]:
     missing: list[str] = []
-    if not os.environ.get("AUTOCRM_NOTION_TOKEN", "").strip():
-        missing.append("AUTOCRM_NOTION_TOKEN")
-    if not os.environ.get("AUTOCRM_NOTION_DATABASE_ID", "").strip():
-        missing.append("AUTOCRM_NOTION_DATABASE_ID")
+    if not os.environ.get("NOTION_TOKEN", "").strip():
+        missing.append("NOTION_TOKEN")
+    if not os.environ.get("NOTION_DATABASE_ID", "").strip():
+        missing.append("NOTION_DATABASE_ID")
     if missing:
         print(
             "Missing required environment variables: " + ", ".join(missing),
@@ -84,7 +84,7 @@ def create_people_page(
     *,
     cfg: dict[str, str],
 ) -> str:
-    name_prop = os.environ.get("AUTOCRM_NOTION_NAME_PROP", "Name")
+    name_prop = os.environ.get("NOTION_NAME_PROP", "Name")
     phones_prop = cfg["PHONES_PROP"]
     emails_prop = cfg["EMAILS_PROP"]
     token = cfg["NOTION_TOKEN"]
