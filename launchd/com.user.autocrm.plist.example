@@ -15,9 +15,9 @@
   <dict>
     <key>PATH</key>
     <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
-    <key>AUTOCRM_NOTION_TOKEN</key>
+    <key>NOTION_TOKEN</key>
     <string>REPLACE_WITH_NOTION_INTEGRATION_SECRET</string>
-    <key>AUTOCRM_NOTION_DATABASE_ID</key>
+    <key>NOTION_DATABASE_ID</key>
     <string>REPLACE_WITH_NOTION_DATABASE_ID</string>
   </dict>
 
