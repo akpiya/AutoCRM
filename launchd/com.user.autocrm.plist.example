@@ -23,9 +23,7 @@
 
   <key>ProgramArguments</key>
   <array>
-    <string>/REPLACE/WITH/path/to/autocrm/.venv/bin/python3</string>
-    <string>-m</string>
-    <string>autocrm.main</string>
+    <string>/Users/REPLACE_ME/.local/bin/autocrm</string>
   </array>
 
   <key>StandardOutPath</key>

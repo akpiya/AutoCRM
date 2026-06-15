@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
-# Install deps, run pytest, then optionally: python3 -m autocrm.main
+# Run Go tests, then cmd/autocrm (requires Mac + optional Notion env).
 
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
-python3 -m pip install -q -e ".[dev]"
-python3 -m pytest tests/ -q
-python3 -m autocrm.main
-echo "OK: autocrm.main completed."
+go test ./... -count=1
+go run ./cmd/autocrm
+echo "OK: autocrm completed."

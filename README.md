@@ -1,25 +1,36 @@
 # AutoCRM
 
-AutoCRM records outbound communication activity on your Mac into a local SQLite **outbox** (`~/.autocrm/outbox.db`), then syncs matched contacts to a Notion people database. The iMessage collector is implemented; phone and Beeper collectors are still stubs.
+AutoCRM records communication activity on your Mac into a local SQLite **outbox** (`~/.autocrm/outbox.db`), then syncs matched contacts to a Notion people database. The iMessage collector is implemented; phone and Beeper collectors are stubs.
+
+Implemented in **Go** (module `github.com/akpiya/autocrm`).
 
 ## Layout
 
 | Path | Purpose |
 |------|---------|
-| `autocrm/` | Python package: `main`, outbox, collectors, `notion.py`. |
-| `launchd/` | LaunchAgent template (`.plist.example`); copy to gitignored `com.user.autocrm.plist`. |
-| `pyproject.toml` | Installable project (`pip install -e ".[dev]"`). |
+| `internal/` | App implementation: `common`, `outbox`, `notion`, `collectors`. |
+| `cmd/autocrm/` | Main pipeline binary. |
+| `scripts/import_imessage_notion.py` | Interactive vCard → Notion import (Python). |
+| `launchd/` | LaunchAgent template (`.plist.example`). |
+| `go.mod` | Go module definition. |
 
 ## Usage
 
 ```bash
-python -m pip install -e ".[dev]"
+go test ./...
 export NOTION_TOKEN="secret_..."
 export NOTION_DATABASE_ID="your-database-id"
-python3 -m autocrm.main
+go run ./cmd/autocrm
 ```
 
-`main` runs collectors, then drains the outbox to Notion when both env vars are set.
+Or build and install:
+
+```bash
+go build -o ~/.local/bin/autocrm ./cmd/autocrm
+~/.local/bin/autocrm
+```
+
+`cmd/autocrm` runs collectors, then drains the outbox to Notion when both env vars are set.
 
 State lives under **`~/.autocrm/`** (outbox DB at `outbox.db`, per-source cursors). The `outbox` table is a pending sync queue; rows are deleted after processing (matched or unmatched).
 
@@ -30,39 +41,49 @@ State lives under **`~/.autocrm/`** (outbox DB at `outbox.db`, per-source cursor
 | `NOTION_TOKEN` | Yes (for sync) |
 | `NOTION_DATABASE_ID` | Yes (for sync) |
 
-Property names, rate-limit interval, and parallel PATCH worker count live in [`autocrm/common.py`](autocrm/common.py) (`NOTION_PHONES_PROP`, `NOTION_MIN_INTERVAL`, `NOTION_PATCH_WORKERS`, etc.). Change those constants if your Notion schema differs.
+Property names, rate-limit interval, and parallel PATCH worker count live in [`internal/common/common.go`](internal/common/common.go). Change those constants if your Notion schema differs.
 
 Unmatched outbox rows (no Notion page with that phone/email) are removed silently. **Last Contacted** only moves forward when the outbox event is newer than the value on the page.
 
-**Multiple phones or emails per person:** use **Multi-select** on the **Phones** and **Emails** columns and add every number/address you message from. AutoCRM matches if the iMessage handle equals **any** value on that page. Notion’s single **Phone** or **Email** field types only store one value per column.
+**Multiple phones or emails per person:** use **Multi-select** on the **Phones** and **Emails** columns. AutoCRM matches if the iMessage handle equals **any** value on that page.
 
 **Phone formatting:** tags can be `+1 703-395-5764`, `(703) 395-5764`, `7033955764`, etc. Matching strips non-digits and compares US numbers with or without a leading `1`.
 
 **Last Channel:** use a Notion **Select** property; include an option named **Text** (outbox platform `text` is written as **Text**).
 
-## Full Disk Access and deployment
+### vCard import
 
-Reading `~/Library/Messages/chat.db` requires **Full Disk Access** on macOS. FDA is granted per **executable**, not per Python package—so granting FDA to Terminal, Cursor, or a shared `python3` applies to everything run from that binary.
+```bash
+python3 scripts/import_imessage_notion.py path/to/contacts.vcf
+```
 
-**Planned approach:** ship a **frozen single-purpose binary** (e.g. PyInstaller or py2app) used only for ingest, e.g. `autocrm-ingest`, and point launchd at that binary. Full Disk Access would be granted **only** to that executable—not to Python in general or your IDE. Production scheduling would use the frozen binary.
+## Full Disk Access
 
-**Interim:** grant FDA to **Terminal** and/or **Cursor** (whichever you use to run `python3 -m autocrm.main`). System Settings → Privacy & Security → Full Disk Access → add the app → quit and reopen it. That is enough for local development and manual runs until the frozen binary exists.
+Reading `~/Library/Messages/chat.db` requires **Full Disk Access** on macOS (per executable).
+
+| How you run | What to add in FDA |
+|-------------|-------------------|
+| `~/.local/bin/autocrm` (recommended) | That binary |
+| `go run ./cmd/autocrm` (dev) | Terminal or your IDE |
+
+System Settings → Privacy & Security → Full Disk Access → **+** → choose the binary.
 
 ### Scheduled runs (launchd)
 
 ```bash
+go build -o ~/.local/bin/autocrm ./cmd/autocrm
 cp launchd/com.user.autocrm.plist.example launchd/com.user.autocrm.plist
-# Edit launchd/com.user.autocrm.plist: Python path, NOTION_TOKEN, NOTION_DATABASE_ID
+# Edit NOTION_* and binary path, then:
 cp launchd/com.user.autocrm.plist ~/Library/LaunchAgents/
-launchctl unload ~/Library/LaunchAgents/com.user.autocrm.plist 2>/dev/null || true
+launchctl bootout gui/$(id -u)/com.user.autocrm 2>/dev/null || true
 launchctl load ~/Library/LaunchAgents/com.user.autocrm.plist
 ```
 
-`launchd/com.user.autocrm.plist` is gitignored so secrets are not committed. Only `com.user.autocrm.plist.example` is tracked.
+`launchd/com.user.autocrm.plist` is gitignored so secrets are not committed.
 
 ## Requirements
 
-- **Mac** for future iMessage / call-history collectors.
-- **Python 3.11+**.
+- **macOS** for iMessage / future call-history collectors.
+- **Go 1.22+** and CGO (for `github.com/mattn/go-sqlite3`).
 
-See **`autocrm/README.md`** for module-level detail.
+See **`internal/README.md`** for package layout. Migration notes: **`MIGRATION_GO.md`**.
