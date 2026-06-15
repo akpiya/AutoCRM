@@ -19,9 +19,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("imessage collector: %v", err)
 	}
+	phoneCalls, err := collectors.NewPhoneCallsCollector()
+	if err != nil {
+		log.Fatalf("phone_calls collector: %v", err)
+	}
 	all := []collectors.Collector{
 		imessage,
-		collectors.PhoneCallsCollector{},
+		phoneCalls,
 		collectors.BeeperCollector{},
 	}
 

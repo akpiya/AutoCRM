@@ -4,7 +4,7 @@ AutoCRM is a **macOS-only** Go tool that records **inbound and outbound** commun
 
 ## Current milestone
 
-**Ingest + Notion sync (Go):** collectors write the outbox and advance ingest cursors; `cmd/autocrm` runs `notion.SyncOutbox` if `NOTION_TOKEN` and `NOTION_DATABASE_ID` are set. Phone and Beeper collectors are stubs.
+**Ingest + Notion sync (Go):** collectors write the outbox and advance ingest cursors; `cmd/autocrm` runs `notion.SyncOutbox` if `NOTION_TOKEN` and `NOTION_DATABASE_ID` are set. iMessage and phone calls are implemented; Beeper is a stub.
 
 ## Repository layout
 
@@ -46,13 +46,21 @@ launchd → autocrm binary → collectors → outbox table
 - Group chats: `;+;` in `chat_identifier` or `guid`; outbound fans out to `chat_handle_join` members.
 - Apple `message.date` is nanoseconds since 2001-01-01 UTC — `common.AppleNsToUnix`.
 - Bootstrap: no cursor → set cursor to `MAX(ROWID)` without backfill.
-- **Full Disk Access** required on the binary (or Terminal for `go run`).
+- **Full Disk Access** is per executable: terminal runs require FDA on the terminal app; launchd runs require FDA on the `autocrm` binary.
+
+## Phone calls notes
+
+- DB: `~/Library/Application Support/CallHistoryDB/CallHistory.storedata` (read-only URI).
+- Supported call rows: connected inbound/outbound calls only.
+- Included call types: cellular (`ZCALLTYPE=1`), FaceTime Video (`8`), FaceTime Audio (`16`).
+- Missed/unanswered calls are ignored in the current implementation.
+- Bootstrap: no cursor → set cursor to `MAX(Z_PK)` without backfill.
 
 ## Notion sync
 
 - Only `NOTION_TOKEN` and `NOTION_DATABASE_ID` from environment.
 - Property names and rate limits: `internal/common/common.go`.
-- Parallel PATCHes: `NOTION_PATCH_WORKERS` goroutines with staggered starts.
+- Parallel PATCHes: `common.NotionPatchWorkers` goroutines with staggered starts.
 
 ## Verification
 
