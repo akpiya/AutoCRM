@@ -2,11 +2,11 @@
 """
 Import contacts from a vCard (.vcf) into the Notion people database.
 
-Requires NOTION_TOKEN and NOTION_DATABASE_ID (same as autocrm.main).
+Requires NOTION_TOKEN and NOTION_DATABASE_ID (same as the Go autocrm binary).
 
-Usage (from repo root, package installed):
+Usage (from repo root):
 
-  python scripts/import_imessage_notion.py path/to/contacts.vcf
+  python3 scripts/import_imessage_notion.py path/to/contacts.vcf
 """
 
 from __future__ import annotations
@@ -20,8 +20,30 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
-from autocrm.common import NOTION_NAME_PROP
-from autocrm.notion import load_notion_config_from_env
+NOTION_NAME_PROP = "Name"
+NOTION_PHONES_PROP = "Phones"
+NOTION_EMAILS_PROP = "Emails"
+
+
+def _notion_property_config() -> dict[str, str]:
+    return {
+        "PHONES_PROP": NOTION_PHONES_PROP,
+        "EMAILS_PROP": NOTION_EMAILS_PROP,
+        "LAST_CONTACTED_PROP": "Last Contacted",
+        "LAST_CHANNEL_PROP": "Last Channel",
+    }
+
+
+def load_notion_config_from_env() -> dict[str, str]:
+    token = os.environ.get("NOTION_TOKEN", "").strip()
+    db_id = os.environ.get("NOTION_DATABASE_ID", "").strip()
+    if not token or not db_id:
+        raise RuntimeError("Set NOTION_TOKEN and NOTION_DATABASE_ID")
+    return {
+        "NOTION_TOKEN": token,
+        "NOTION_DATABASE_ID": db_id,
+        **_notion_property_config(),
+    }
 
 
 @dataclass(frozen=True)
