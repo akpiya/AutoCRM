@@ -34,7 +34,7 @@ func MaxMessageRowid(chatDB string) (int, error) {
 }
 
 func openChatDB(chatDB string) (*sql.DB, error) {
-	uri := fmt.Sprintf("file:%s?mode=ro", chatDB)
+	uri := fmt.Sprintf("file:%s?mode=ro&immutable=1", chatDB)
 	return sql.Open("sqlite3", uri)
 }
 
