@@ -65,6 +65,15 @@ func TestPlatformToChannelOption(t *testing.T) {
 	if notion.PlatformToChannelOption("TEXT") != "Text" {
 		t.Fatal()
 	}
+	if notion.PlatformToChannelOption("phone_call") != "Phone" {
+		t.Fatal()
+	}
+	if notion.PlatformToChannelOption("facetime_audio") != "Facetime" {
+		t.Fatal()
+	}
+	if notion.PlatformToChannelOption("facetime_video") != "Facetime" {
+		t.Fatal()
+	}
 }
 
 func TestChannelPropertyPayloadSelect(t *testing.T) {
@@ -72,6 +81,18 @@ func TestChannelPropertyPayloadSelect(t *testing.T) {
 	want := map[string]any{"select": map[string]any{"name": "Text"}}
 	if fmtSelect(got) != fmtSelect(want) {
 		t.Fatalf("got %v", got)
+	}
+
+	gotPhone := notion.ChannelPropertyPayload("phone_call", map[string]any{"type": "select"})
+	wantPhone := map[string]any{"select": map[string]any{"name": "Phone"}}
+	if fmtSelect(gotPhone) != fmtSelect(wantPhone) {
+		t.Fatalf("got %v", gotPhone)
+	}
+
+	gotFacetime := notion.ChannelPropertyPayload("facetime_video", map[string]any{"type": "select"})
+	wantFacetime := map[string]any{"select": map[string]any{"name": "Facetime"}}
+	if fmtSelect(gotFacetime) != fmtSelect(wantFacetime) {
+		t.Fatalf("got %v", gotFacetime)
 	}
 }
 

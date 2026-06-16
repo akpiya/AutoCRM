@@ -23,3 +23,18 @@ func TestAppleNsToUnix(t *testing.T) {
 	}
 	_ = time.UTC
 }
+
+func TestAppleSecToUnix(t *testing.T) {
+	if _, ok := common.AppleSecToUnix(0); ok {
+		t.Fatal("expected false for 0")
+	}
+	sec := float64(testfixtures.AppleSec20010102 + 2)
+	got, ok := common.AppleSecToUnix(sec)
+	if !ok {
+		t.Fatal("expected true")
+	}
+	expected := float64(common.AppleEpochUTC.Unix()) + float64(common.AppleEpochUTC.Nanosecond())/1e9 + sec
+	if got != expected {
+		t.Fatalf("got %v want %v", got, expected)
+	}
+}

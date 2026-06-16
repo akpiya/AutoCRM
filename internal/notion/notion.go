@@ -86,10 +86,16 @@ func NormalizeEmail(e string) string {
 
 // PlatformToChannelOption maps outbox platform to a Notion select name.
 func PlatformToChannelOption(platform string) string {
-	if strings.EqualFold(strings.TrimSpace(platform), "text") {
+	switch strings.ToLower(strings.TrimSpace(platform)) {
+	case "text":
 		return "Text"
+	case "phone_call":
+		return "Phone"
+	case "facetime_audio", "facetime_video":
+		return "Facetime"
+	default:
+		return strings.TrimSpace(platform)
 	}
-	return strings.TrimSpace(platform)
 }
 
 // ChannelPropertyPayload builds Notion property value for Last Channel.

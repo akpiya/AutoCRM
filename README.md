@@ -1,6 +1,6 @@
 # AutoCRM
 
-AutoCRM records communication activity on your Mac into a local SQLite **outbox** (`~/.autocrm/outbox.db`), then syncs matched contacts to a Notion people database. The iMessage collector is implemented; phone and Beeper collectors are stubs.
+AutoCRM records communication activity on your Mac into a local SQLite **outbox** (`~/.autocrm/outbox.db`), then syncs matched contacts to a Notion people database. iMessage and phone call collectors are implemented; Beeper remains a stub.
 
 Implemented in **Go** (module `github.com/akpiya/autocrm`).
 
@@ -14,11 +14,17 @@ go build -o ~/.local/bin/autocrm ./cmd/autocrm
 
 ### 2. Grant Full Disk Access
 
-The iMessage collector reads `~/Library/Messages/chat.db`, which macOS gates behind Full Disk Access.
+AutoCRM reads:
 
-**System Settings → Privacy & Security → Full Disk Access → + →** select `~/.local/bin/autocrm`.
+- `~/Library/Messages/chat.db` (iMessage/SMS)
+- `~/Library/Application Support/CallHistoryDB/CallHistory.storedata` (phone/FaceTime call history)
 
-For dev iteration with `go run`, add your Terminal or IDE instead.
+macOS checks Full Disk Access on the process that opens those files:
+
+- terminal runs: grant FDA to the terminal app (Terminal, iTerm, Alacritty, Cursor, etc.)
+- launchd runs: grant FDA to `~/.local/bin/autocrm`
+
+After toggling FDA, fully restart the app (or log out/in) before retrying.
 
 ### 3. Set up your Notion database
 
@@ -29,7 +35,7 @@ Create a Notion database with these properties (names must match exactly):
 | **Phones** | Multi-select | One tag per phone number, any format |
 | **Emails** | Email or Multi-select | |
 | **Last Contacted** | Date | |
-| **Last Channel** | Select | Include a **Text** option |
+| **Last Channel** | Select | Include **Text**, **Phone**, and **Facetime** options |
 
 Then create a [Notion integration](https://www.notion.so/my-integrations), share the database with it, and grab the token and database ID.
 
@@ -67,7 +73,8 @@ This walks each contact interactively and creates Notion pages for the ones you 
 cp launchd/com.user.autocrm.plist.example launchd/com.user.autocrm.plist
 # Edit NOTION_TOKEN, NOTION_DATABASE_ID, and binary path in the plist, then:
 cp launchd/com.user.autocrm.plist ~/Library/LaunchAgents/
-launchctl load ~/Library/LaunchAgents/com.user.autocrm.plist
+launchctl bootout gui/$(id -u)/com.user.autocrm 2>/dev/null || true
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.user.autocrm.plist
 ```
 
 The gitignored copy keeps your secrets out of the repo.
@@ -94,6 +101,14 @@ State lives under **`~/.autocrm/`** (outbox DB at `outbox.db`, per-source cursor
 - **Phone formatting:** tags can be `+1 703-395-5764`, `(703) 395-5764`, `7033955764`, etc. Matching strips non-digits and compares US numbers with or without a leading `1`.
 
 Property names, rate-limit interval, and parallel PATCH worker count live in [`internal/common/common.go`](internal/common/common.go). Change those constants if your Notion schema differs.
+
+## Phone calls collector behavior
+
+- Source DB: `~/Library/Application Support/CallHistoryDB/CallHistory.storedata`.
+- Event scope: connected inbound/outbound calls only.
+- Included sources: cellular + FaceTime (audio/video).
+- Excluded in this version: missed/unanswered calls.
+- First run bootstrap: if no `phone_calls` cursor exists, cursor is set to current max call row id without backfill.
 
 ## Requirements
 
