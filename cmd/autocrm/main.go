@@ -23,13 +23,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("phone_calls collector: %v", err)
 	}
-	all := []collectors.Collector{
+	collectors := []collectors.Collector{
 		imessage,
 		phoneCalls,
 		collectors.BeeperCollector{},
 	}
 
-	for _, c := range all {
+	for _, c := range collectors {
 		log.Printf("Collector start: %s", c.App())
 		t0 := time.Now()
 		result, err := c.Collect()
@@ -38,10 +38,18 @@ func main() {
 			log.Printf("Collector failed: %s: %v", c.App(), err)
 			continue
 		}
+		var cursorBefore any
+		if result.CursorBefore != nil {
+			cursorBefore = *result.CursorBefore
+		}
+		var cursorAfter any
+		if result.CursorAfter != nil {
+			cursorAfter = *result.CursorAfter
+		}
 		log.Printf(
 			"Collector done: %s in %.2fs (enqueued=%d cursor_before=%v cursor_after=%v)",
 			c.App(), time.Since(t0).Seconds(), result.Enqueued,
-			ptrVal(result.CursorBefore), ptrVal(result.CursorAfter),
+			cursorBefore, cursorAfter,
 		)
 	}
 
@@ -73,11 +81,4 @@ func main() {
 		}
 		log.Fatalf("pipeline completed with failures: %s", strings.Join(uniq, ", "))
 	}
-}
-
-func ptrVal(p *float64) any {
-	if p == nil {
-		return nil
-	}
-	return *p
 }
