@@ -22,6 +22,8 @@ func main() {
 	}
 
 	switch os.Args[1] {
+	case "install":
+		os.Exit(runInstall())
 	case "run":
 		runPipeline()
 	case "doctor":
@@ -42,6 +44,7 @@ Usage:
   autocrm <command>
 
 Commands:
+  install  Install AutoCRM as a background LaunchAgent
   run      Run collectors and sync pending activity to Notion
   doctor   Check install location, Full Disk Access, launchd, and Notion setup
   help     Show this help
