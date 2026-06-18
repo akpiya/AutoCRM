@@ -11,6 +11,7 @@ import (
 const (
 	launchAgentLabel = "com.user.autocrm"
 	defaultInterval  = 300
+	appBundleName    = "AutoCRM.app"
 )
 
 type launchAgentConfig struct {
@@ -21,11 +22,27 @@ type launchAgentConfig struct {
 }
 
 func installedBinaryPath() (string, error) {
+	appPath, err := installedAppPath()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(appPath, "Contents", "MacOS", "autocrm"), nil
+}
+
+func installedAppPath() (string, error) {
+	dir, err := autocrmDataDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, appBundleName), nil
+}
+
+func autocrmDataDir() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ".local", "bin", "autocrm"), nil
+	return filepath.Join(home, ".autocrm"), nil
 }
 
 func launchAgentPath() (string, error) {

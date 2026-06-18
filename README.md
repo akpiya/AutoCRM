@@ -1,8 +1,20 @@
-# AutoCRM
+<div align="center">
+  <img src="assets/Assets.xcassets/AppIcon.appiconset/256.png" alt="AutoCRM app icon" width="128" height="128">
+  <h1>AutoCRM</h1>
+  <p><strong>Keep your Notion people database current from Mac communication activity.</strong></p>
+  <p>AutoCRM runs quietly on macOS, records recent communication activity locally, and syncs matched contacts to Notion.</p>
+  <p>
+    <a href="https://github.com/akpiya/AutoCRM/releases">Download</a>
+    ·
+    <a href="#4-install">Install</a>
+    ·
+    <a href="#troubleshooting">Troubleshooting</a>
+    ·
+    <a href="#privacy">Privacy</a>
+  </p>
+</div>
 
-AutoCRM is a macOS command-line app that keeps a Notion people database updated from your communication activity.
-
-It reads recent iMessage/SMS and phone/FaceTime activity from your Mac, stores pending updates in a local SQLite outbox, and syncs matched people in Notion with:
+AutoCRM reads recent iMessage/SMS and phone/FaceTime activity from your Mac, stores pending updates in a local SQLite outbox, and syncs matched people in Notion with:
 
 - `Last Contacted`
 - `Last Channel`
