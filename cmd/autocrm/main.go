@@ -24,6 +24,8 @@ func main() {
 	switch os.Args[1] {
 	case "run":
 		runPipeline()
+	case "doctor":
+		os.Exit(runDoctor())
 	case "help", "-h", "--help":
 		printUsage(os.Stdout)
 	default:
@@ -41,6 +43,7 @@ Usage:
 
 Commands:
   run      Run collectors and sync pending activity to Notion
+  doctor   Check Notion, local databases, outbox, and launchd setup
   help     Show this help
 `)
 }
