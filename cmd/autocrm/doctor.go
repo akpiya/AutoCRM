@@ -137,11 +137,3 @@ func checkNotion() doctorCheck {
 	}
 	return doctorCheck{name: "Notion database"}
 }
-
-func launchAgentPath() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return filepath.Join(home, "Library", "LaunchAgents", launchAgentLabel+".plist"), nil
-}
