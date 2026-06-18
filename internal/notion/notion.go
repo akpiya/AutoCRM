@@ -32,6 +32,11 @@ type Config struct {
 	Props      map[string]string
 }
 
+// ValidationResult describes whether a Notion database is usable by AutoCRM.
+type ValidationResult struct {
+	MissingProperties []string
+}
+
 // Configured reports whether Notion env vars are set.
 func Configured() bool {
 	return strings.TrimSpace(os.Getenv("NOTION_TOKEN")) != "" &&
@@ -50,6 +55,37 @@ func LoadConfigFromEnv() (Config, error) {
 		DatabaseID: dbID,
 		Props:      common.NotionPropertyConfig(),
 	}, nil
+}
+
+// ValidateDatabase checks that the configured Notion database is reachable and
+// exposes the properties AutoCRM needs.
+func ValidateDatabase(client *http.Client, cfg Config) (ValidationResult, error) {
+	if client == nil {
+		client = &http.Client{Timeout: 30 * time.Second}
+	}
+	props := cfg.Props
+	if props == nil {
+		props = common.NotionPropertyConfig()
+	}
+	url := "https://api.notion.com/v1/databases/" + cfg.DatabaseID
+	db, err := notionRequest(client, http.MethodGet, url, cfg.Token, nil)
+	if err != nil {
+		return ValidationResult{}, err
+	}
+	rawProps, _ := db["properties"].(map[string]any)
+	required := []string{
+		props["PHONES_PROP"],
+		props["EMAILS_PROP"],
+		props["LAST_CONTACTED_PROP"],
+		props["LAST_CHANNEL_PROP"],
+	}
+	var missing []string
+	for _, name := range required {
+		if _, ok := rawProps[name]; !ok {
+			missing = append(missing, name)
+		}
+	}
+	return ValidationResult{MissingProperties: missing}, nil
 }
 
 // PhoneDigits strips non-digits from a phone string.
