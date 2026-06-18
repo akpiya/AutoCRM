@@ -16,7 +16,7 @@ AutoCRM is a **macOS-only** Go tool that records **inbound and outbound** commun
 | `internal/common/` | `~/.autocrm` paths, Apple epoch, Notion constants. |
 | `internal/collectors/` | iMessage, phone, Beeper collectors. |
 | `internal/testfixtures/` | Minimal `chat.db` for tests. |
-| `launchd/com.user.autocrm.plist.example` | LaunchAgent template. |
+| `assets/` | App icon source assets. |
 | `scripts/e2e_verify.sh` | `go test` + `go run ./cmd/autocrm`. |
 
 Run tests: `go test ./...` from repo root.

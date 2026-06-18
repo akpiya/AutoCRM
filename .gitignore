@@ -8,5 +8,5 @@ __pycache__/
 *.tfstate
 .DS_Store
 
-# Local LaunchAgent with real Notion tokens (copy from com.user.autocrm.plist.example)
-launchd/com.user.autocrm.plist
+# Local LaunchAgent with real Notion tokens.
+com.user.autocrm.plist
