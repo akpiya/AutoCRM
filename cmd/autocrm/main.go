@@ -1,8 +1,10 @@
-// AutoCRM entrypoint — run collectors, then Notion sync when configured.
+// AutoCRM entrypoint.
 package main
 
 import (
+	"fmt"
 	"log"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -13,6 +15,37 @@ import (
 
 func main() {
 	log.SetFlags(log.LstdFlags)
+
+	if len(os.Args) < 2 {
+		printUsage(os.Stderr)
+		os.Exit(2)
+	}
+
+	switch os.Args[1] {
+	case "run":
+		runPipeline()
+	case "help", "-h", "--help":
+		printUsage(os.Stdout)
+	default:
+		fmt.Fprintf(os.Stderr, "unknown command: %s\n\n", os.Args[1])
+		printUsage(os.Stderr)
+		os.Exit(2)
+	}
+}
+
+func printUsage(out *os.File) {
+	fmt.Fprint(out, `AutoCRM syncs Mac communication activity to a Notion people database.
+
+Usage:
+  autocrm <command>
+
+Commands:
+  run      Run collectors and sync pending activity to Notion
+  help     Show this help
+`)
+}
+
+func runPipeline() {
 	var failures []string
 
 	imessage, err := collectors.NewIMessageCollector()
