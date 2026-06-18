@@ -43,7 +43,7 @@ Usage:
 
 Commands:
   run      Run collectors and sync pending activity to Notion
-  doctor   Check Notion, local databases, outbox, and launchd setup
+  doctor   Check install location, Full Disk Access, launchd, and Notion setup
   help     Show this help
 `)
 }

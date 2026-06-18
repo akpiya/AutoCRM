@@ -10,7 +10,6 @@ import (
 	"github.com/akpiya/autocrm/internal/collectors"
 	"github.com/akpiya/autocrm/internal/common"
 	"github.com/akpiya/autocrm/internal/notion"
-	"github.com/akpiya/autocrm/internal/outbox"
 )
 
 type doctorCheck struct {
@@ -21,12 +20,12 @@ type doctorCheck struct {
 func runDoctor() int {
 	checks := []doctorCheck{
 		checkAutocrmDir(),
-		checkOutboxPath(),
+		checkInstalledBinary(),
 		checkMessagesDB(),
 		checkCallHistoryDB(),
 		checkLaunchAgent(),
+		checkNotion(),
 	}
-	checks = append(checks, checkNotion())
 
 	failed := 0
 	for _, check := range checks {
@@ -46,41 +45,67 @@ func runDoctor() int {
 }
 
 func checkAutocrmDir() doctorCheck {
-	_, err := common.AutocrmDir()
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return doctorCheck{name: "~/.autocrm directory", err: err}
+	}
+	path := filepath.Join(home, ".autocrm")
+	info, err := os.Stat(path)
+	if err != nil {
+		return doctorCheck{name: "~/.autocrm directory", err: err}
+	}
+	if !info.IsDir() {
+		return doctorCheck{name: "~/.autocrm directory", err: fmt.Errorf("%s is not a directory", path)}
+	}
 	return doctorCheck{name: "~/.autocrm directory", err: err}
 }
 
-func checkOutboxPath() doctorCheck {
-	path, err := common.OutboxDBPath()
+func checkInstalledBinary() doctorCheck {
+	expected, err := installedBinaryPath()
 	if err != nil {
-		return doctorCheck{name: "outbox path", err: err}
+		return doctorCheck{name: "installed binary location", err: err}
 	}
-	if err := outbox.InitDB(path); err != nil {
-		return doctorCheck{name: "outbox database", err: err}
+	actual, err := os.Executable()
+	if err != nil {
+		return doctorCheck{name: "installed binary location", err: err}
 	}
-	return doctorCheck{name: "outbox database"}
+	actual, err = filepath.EvalSymlinks(actual)
+	if err != nil {
+		return doctorCheck{name: "installed binary location", err: err}
+	}
+	expected, err = filepath.EvalSymlinks(expected)
+	if err != nil {
+		return doctorCheck{name: "installed binary location", err: err}
+	}
+	if actual != expected {
+		return doctorCheck{
+			name: "installed binary location",
+			err:  fmt.Errorf("running %s; expected %s", actual, expected),
+		}
+	}
+	return doctorCheck{name: "installed binary location"}
 }
 
 func checkMessagesDB() doctorCheck {
 	path := common.DefaultChatDBPath()
 	if _, err := os.Stat(path); err != nil {
-		return doctorCheck{name: "Messages database", err: err}
+		return doctorCheck{name: "Full Disk Access: Messages database", err: err}
 	}
 	if _, err := collectors.MaxMessageRowid(path); err != nil {
-		return doctorCheck{name: "Messages database", err: err}
+		return doctorCheck{name: "Full Disk Access: Messages database", err: err}
 	}
-	return doctorCheck{name: "Messages database"}
+	return doctorCheck{name: "Full Disk Access: Messages database"}
 }
 
 func checkCallHistoryDB() doctorCheck {
 	path := common.DefaultCallHistoryDBPath()
 	if _, err := os.Stat(path); err != nil {
-		return doctorCheck{name: "Call history database", err: err}
+		return doctorCheck{name: "Full Disk Access: Call history database", err: err}
 	}
 	if _, err := collectors.MaxCallRowid(path); err != nil {
-		return doctorCheck{name: "Call history database", err: err}
+		return doctorCheck{name: "Full Disk Access: Call history database", err: err}
 	}
-	return doctorCheck{name: "Call history database"}
+	return doctorCheck{name: "Full Disk Access: Call history database"}
 }
 
 func checkLaunchAgent() doctorCheck {
