@@ -67,17 +67,13 @@ python3 scripts/import_imessage_notion.py path/to/contacts.vcf
 
 This walks each contact interactively and creates Notion pages for the ones you choose. Same `NOTION_TOKEN` / `NOTION_DATABASE_ID` env vars required.
 
-### 6. Schedule with launchd (optional)
+### 6. Install the LaunchAgent
 
 ```bash
-cp launchd/com.user.autocrm.plist.example launchd/com.user.autocrm.plist
-# Edit NOTION_TOKEN, NOTION_DATABASE_ID, and binary path in the plist, then:
-cp launchd/com.user.autocrm.plist ~/Library/LaunchAgents/
-launchctl bootout gui/$(id -u)/com.user.autocrm 2>/dev/null || true
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.user.autocrm.plist
+./AutoCRM.app/Contents/MacOS/autocrm install
 ```
 
-The gitignored copy keeps your secrets out of the repo.
+The installer writes the LaunchAgent with your Notion configuration and loads it with `launchctl`.
 
 ---
 
@@ -87,8 +83,8 @@ The gitignored copy keeps your secrets out of the repo.
 |------|---------|
 | `internal/` | App implementation: `common`, `outbox`, `notion`, `collectors`. |
 | `cmd/autocrm/` | Main pipeline binary. |
+| `assets/` | App icon source assets. |
 | `scripts/import_imessage_notion.py` | Interactive vCard → Notion import (Python). |
-| `launchd/` | LaunchAgent template (`.plist.example`). |
 | `go.mod` | Go module definition. |
 
 ## Notion sync details

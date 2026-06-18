@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"os/exec"
@@ -43,13 +44,13 @@ func runInstall() int {
 		return 1
 	}
 
-	installedPath, err := installBinary()
+	installedApp, installedBinary, err := installApp()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Install failed: %v\n", err)
 		return 1
 	}
 	plistPath, err := writeLaunchAgent(launchAgentConfig{
-		BinaryPath:       installedPath,
+		BinaryPath:       installedBinary,
 		NotionToken:      token,
 		NotionDatabaseID: databaseID,
 		StartInterval:    interval,
@@ -60,7 +61,7 @@ func runInstall() int {
 	}
 
 	fmt.Fprintln(os.Stdout)
-	printFullDiskAccessInstructions(os.Stdout, installedPath)
+	printFullDiskAccessInstructions(os.Stdout, installedApp)
 	openFullDiskAccessSettings()
 	waitForEnter(reader, "Press Enter after Full Disk Access is enabled for AutoCRM.")
 
@@ -70,7 +71,8 @@ func runInstall() int {
 	}
 
 	fmt.Fprintln(os.Stdout)
-	fmt.Fprintf(os.Stdout, "Installed binary: %s\n", installedPath)
+	fmt.Fprintf(os.Stdout, "Installed app: %s\n", installedApp)
+	fmt.Fprintf(os.Stdout, "Installed binary: %s\n", installedBinary)
 	fmt.Fprintf(os.Stdout, "Installed LaunchAgent: %s\n", plistPath)
 	fmt.Fprintln(os.Stdout, "AutoCRM is loaded and will run in the background.")
 	return 0
@@ -122,26 +124,88 @@ func waitForEnter(reader *bufio.Reader, message string) {
 	_, _ = reader.ReadString('\n')
 }
 
-func installBinary() (string, error) {
-	src, err := os.Executable()
+func installApp() (appPath string, binaryPath string, err error) {
+	srcApp, err := sourceAppPath()
+	if err != nil {
+		return "", "", err
+	}
+	dstApp, err := installedAppPath()
+	if err != nil {
+		return "", "", err
+	}
+	dstBinary, err := installedBinaryPath()
+	if err != nil {
+		return "", "", err
+	}
+	if samePath(srcApp, dstApp) {
+		return dstApp, dstBinary, nil
+	}
+	if err := os.MkdirAll(filepath.Dir(dstApp), 0o755); err != nil {
+		return "", "", err
+	}
+	if err := os.RemoveAll(dstApp); err != nil {
+		return "", "", err
+	}
+	if err := copyDir(srcApp, dstApp); err != nil {
+		return "", "", err
+	}
+	return dstApp, dstBinary, nil
+}
+
+func sourceAppPath() (string, error) {
+	exe, err := os.Executable()
 	if err != nil {
 		return "", err
 	}
-	src, err = filepath.EvalSymlinks(src)
+	exe, err = filepath.EvalSymlinks(exe)
 	if err != nil {
 		return "", err
 	}
-	dst, err := installedBinaryPath()
-	if err != nil {
-		return "", err
+	appPath := filepath.Clean(filepath.Join(filepath.Dir(exe), "..", ".."))
+	if filepath.Base(appPath) != appBundleName {
+		return "", fmt.Errorf("run install from %s/Contents/MacOS/autocrm", appBundleName)
 	}
-	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
-		return "", err
+	if _, err := os.Stat(filepath.Join(appPath, "Contents", "Info.plist")); err != nil {
+		return "", fmt.Errorf("invalid app bundle %s: %w", appPath, err)
 	}
-	if err := copyFile(src, dst, 0o755); err != nil {
-		return "", err
+	return appPath, nil
+}
+
+func samePath(a, b string) bool {
+	aEval, aErr := filepath.EvalSymlinks(a)
+	bEval, bErr := filepath.EvalSymlinks(b)
+	if aErr != nil || bErr != nil {
+		return filepath.Clean(a) == filepath.Clean(b)
 	}
-	return dst, nil
+	return aEval == bEval
+}
+
+func copyDir(src, dst string) error {
+	return filepath.WalkDir(src, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		target := filepath.Join(dst, rel)
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return os.MkdirAll(target, info.Mode())
+		}
+		if d.Type()&os.ModeSymlink != 0 {
+			linkTarget, err := os.Readlink(path)
+			if err != nil {
+				return err
+			}
+			return os.Symlink(linkTarget, target)
+		}
+		return copyFile(path, target, info.Mode())
+	})
 }
 
 func copyFile(src, dst string, mode os.FileMode) error {
@@ -188,7 +252,7 @@ func reloadLaunchAgent(plistPath string) error {
 func printFullDiskAccessInstructions(w io.Writer, binaryPath string) {
 	fmt.Fprintln(w, "Full Disk Access is required before AutoCRM can read Messages and call history.")
 	fmt.Fprintln(w, "Open System Settings > Privacy & Security > Full Disk Access.")
-	fmt.Fprintf(w, "Add and enable this file: %s\n", binaryPath)
+	fmt.Fprintf(w, "Add and enable this app: %s\n", binaryPath)
 	fmt.Fprintln(w, "After enabling access, AutoCRM will run in the background on the configured interval.")
 	fmt.Fprintln(w, "Logs:")
 	fmt.Fprintln(w, "  /tmp/autocrm.log")

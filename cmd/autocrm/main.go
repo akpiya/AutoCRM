@@ -30,6 +30,8 @@ func main() {
 		os.Exit(runPipeline())
 	case "doctor":
 		os.Exit(runDoctor())
+	case "doctor-fda-probe":
+		os.Exit(runDoctorFDAProbe(os.Args[2:]))
 	case "help", "-h", "--help":
 		printUsage(os.Stdout)
 	default:
@@ -47,7 +49,7 @@ Usage:
 
 Commands:
   install  Install AutoCRM as a background LaunchAgent
-  uninstall Remove AutoCRM's LaunchAgent, binary, logs, and data
+  uninstall Remove AutoCRM's LaunchAgent, app, logs, and data
   run      Run collectors and sync pending activity to Notion
   doctor   Check install location, Full Disk Access, launchd, and Notion setup
   help     Show this help
