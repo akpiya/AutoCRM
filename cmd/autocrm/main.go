@@ -27,7 +27,7 @@ func main() {
 	case "uninstall":
 		os.Exit(runUninstall())
 	case "run":
-		runPipeline()
+		os.Exit(runPipeline())
 	case "doctor":
 		os.Exit(runDoctor())
 	case "help", "-h", "--help":
@@ -47,23 +47,25 @@ Usage:
 
 Commands:
   install  Install AutoCRM as a background LaunchAgent
-  uninstall Remove AutoCRM's LaunchAgent and installed binary
+  uninstall Remove AutoCRM's LaunchAgent, binary, logs, and data
   run      Run collectors and sync pending activity to Notion
   doctor   Check install location, Full Disk Access, launchd, and Notion setup
   help     Show this help
 `)
 }
 
-func runPipeline() {
+func runPipeline() int {
 	var failures []string
 
 	imessage, err := collectors.NewIMessageCollector()
 	if err != nil {
-		log.Fatalf("imessage collector: %v", err)
+		log.Printf("imessage collector: %v", err)
+		return 1
 	}
 	phoneCalls, err := collectors.NewPhoneCallsCollector()
 	if err != nil {
-		log.Fatalf("phone_calls collector: %v", err)
+		log.Printf("phone_calls collector: %v", err)
+		return 1
 	}
 	collectors := []collectors.Collector{
 		imessage,
@@ -95,7 +97,10 @@ func runPipeline() {
 		)
 	}
 
-	if notion.Configured() {
+	if !notion.Configured() {
+		failures = append(failures, "notion")
+		log.Print("Notion sync failed: set NOTION_TOKEN and NOTION_DATABASE_ID")
+	} else {
 		log.Print("Notion sync start")
 		t0 := time.Now()
 		stats, err := notion.SyncOutbox("", nil, 0)
@@ -121,6 +126,8 @@ func runPipeline() {
 				uniq = append(uniq, f)
 			}
 		}
-		log.Fatalf("pipeline completed with failures: %s", strings.Join(uniq, ", "))
+		log.Printf("pipeline completed with failures: %s", strings.Join(uniq, ", "))
+		return 1
 	}
+	return 0
 }

@@ -1,11 +1,10 @@
 package main
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"os/exec"
-	"strings"
+	"path/filepath"
 )
 
 func runUninstall() int {
@@ -29,15 +28,32 @@ func runUninstall() int {
 		fmt.Fprintf(os.Stderr, "Unable to resolve installed binary path: %v\n", err)
 		return 1
 	}
-	if askYesNo("Remove installed binary at " + binaryPath + "? [y/N]: ") {
-		if err := removeIfExists(binaryPath); err != nil {
-			fmt.Fprintf(os.Stderr, "Unable to remove installed binary: %v\n", err)
+	if err := removeIfExists(binaryPath); err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to remove installed binary: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(os.Stdout, "Removed installed binary: %s\n", binaryPath)
+
+	dataDir, err := autocrmDataDir()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to resolve AutoCRM data directory: %v\n", err)
+		return 1
+	}
+	if err := removeAllIfExists(dataDir); err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to remove AutoCRM data directory: %v\n", err)
+		return 1
+	}
+	fmt.Fprintf(os.Stdout, "Removed AutoCRM data directory: %s\n", dataDir)
+
+	for _, logPath := range []string{"/tmp/autocrm.log", "/tmp/autocrm.err"} {
+		if err := removeIfExists(logPath); err != nil {
+			fmt.Fprintf(os.Stderr, "Unable to remove log file %s: %v\n", logPath, err)
 			return 1
 		}
-		fmt.Fprintf(os.Stdout, "Removed installed binary: %s\n", binaryPath)
+		fmt.Fprintf(os.Stdout, "Removed log file: %s\n", logPath)
 	}
 
-	fmt.Fprintln(os.Stdout, "Kept ~/.autocrm data directory.")
+	fmt.Fprintln(os.Stdout, "Removed AutoCRM.")
 	return 0
 }
 
@@ -53,10 +69,17 @@ func removeIfExists(path string) error {
 	return nil
 }
 
-func askYesNo(prompt string) bool {
-	fmt.Fprint(os.Stdout, prompt)
-	reader := bufio.NewReader(os.Stdin)
-	answer, _ := reader.ReadString('\n')
-	answer = strings.ToLower(strings.TrimSpace(answer))
-	return answer == "y" || answer == "yes"
+func removeAllIfExists(path string) error {
+	if err := os.RemoveAll(path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
+func autocrmDataDir() (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ".autocrm"), nil
 }
