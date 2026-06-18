@@ -32,7 +32,7 @@ Because AutoCRM is not notarized by Apple, macOS may warn you before running it.
 - a Notion account
 - a Notion integration token
 - a Notion people database
-- Full Disk Access for the installed AutoCRM binary
+- Full Disk Access for the installed AutoCRM app
 
 You do not need Go installed if you download a release zip.
 
@@ -77,7 +77,7 @@ Most M1, M2, M3, and M4 Macs use Apple Silicon.
 Unzip the file. It contains:
 
 ```text
-autocrm
+AutoCRM.app
 README.txt
 ```
 
@@ -86,13 +86,13 @@ README.txt
 Open Terminal in the unzipped folder and run:
 
 ```bash
-./autocrm install
+./AutoCRM.app/Contents/MacOS/autocrm install
 ```
 
-If macOS refuses to run the downloaded binary, open System Settings > Privacy & Security and approve AutoCRM. If Terminal still reports that the file is blocked, remove the download quarantine flag:
+If macOS refuses to run the downloaded app, open System Settings > Privacy & Security and approve AutoCRM. If Terminal still reports that the app is blocked, remove the download quarantine flag:
 
 ```bash
-xattr -d com.apple.quarantine ./autocrm
+xattr -dr com.apple.quarantine ./AutoCRM.app
 ```
 
 The installer will:
@@ -101,7 +101,7 @@ The installer will:
 2. Ask for your Notion integration token.
 3. Ask for your Notion database ID.
 4. Validate that Notion is reachable and has the required properties.
-5. Copy AutoCRM to `~/.local/bin/autocrm`.
+5. Copy AutoCRM to `~/.autocrm/AutoCRM.app`.
 6. Write `~/Library/LaunchAgents/com.user.autocrm.plist`.
 7. Guide you through enabling Full Disk Access.
 8. Load the background LaunchAgent.
@@ -126,23 +126,28 @@ macOS blocks those files unless the exact executable has Full Disk Access.
 During install, enable Full Disk Access for:
 
 ```text
-~/.local/bin/autocrm
+~/.autocrm/AutoCRM.app
 ```
 
 If AutoCRM cannot read Messages or call history, run:
 
 ```bash
-~/.local/bin/autocrm doctor
+~/.autocrm/AutoCRM.app/Contents/MacOS/autocrm doctor
 ```
 
 ## Commands
+
+The installed command lives at:
+
+```text
+~/.autocrm/AutoCRM.app/Contents/MacOS/autocrm
+```
 
 ```bash
 autocrm install
 autocrm run
 autocrm doctor
 autocrm uninstall
-autocrm version
 ```
 
 `autocrm run` runs one collector/sync pass. The LaunchAgent uses this command in the background.
@@ -151,12 +156,14 @@ autocrm version
 
 - Notion credentials
 - required Notion database properties
-- Messages database readability
-- call history database readability
-- local outbox initialization
+- Messages database readability through the installed app
+- call history database readability through the installed app
+- installed app location
 - LaunchAgent presence
 
-`autocrm uninstall` unloads and removes the LaunchAgent. It asks before deleting `~/.local/bin/autocrm` and keeps `~/.autocrm` data by default.
+The Notion portion of `doctor` reads `NOTION_TOKEN` and `NOTION_DATABASE_ID` from the current environment. The background LaunchAgent gets those values from its plist.
+
+`autocrm uninstall` unloads and removes the LaunchAgent, installed app, local AutoCRM data directory, and logs.
 
 ## Logs
 
@@ -199,7 +206,7 @@ Notion sync behavior:
 Run:
 
 ```bash
-~/.local/bin/autocrm doctor
+~/.autocrm/AutoCRM.app/Contents/MacOS/autocrm doctor
 ```
 
 Common issues:
@@ -207,10 +214,10 @@ Common issues:
 | Problem | Fix |
 |---------|-----|
 | Notion validation fails | Confirm the token, database ID, database sharing, and required properties. |
-| Messages database fails | Enable Full Disk Access for `~/.local/bin/autocrm`. |
-| Call history database fails | Enable Full Disk Access for `~/.local/bin/autocrm`. |
+| Messages database fails | Enable Full Disk Access for `~/.autocrm/AutoCRM.app`. |
+| Call history database fails | Enable Full Disk Access for `~/.autocrm/AutoCRM.app`. |
 | No Notion pages update | Confirm people have matching values in `Phones` or `Emails`. |
-| macOS blocks the binary | Open System Settings > Privacy & Security and approve AutoCRM. |
+| macOS blocks the app | Open System Settings > Privacy & Security and approve AutoCRM. |
 
 ## Building From Source
 
@@ -219,6 +226,7 @@ Developer requirements:
 - Go 1.22+
 - CGO support
 - SQLite driver dependencies for `github.com/mattn/go-sqlite3`
+- Xcode command-line tools for release packaging (`xcrun actool`)
 
 Build:
 
@@ -250,6 +258,7 @@ dist/autocrm-macos-amd64.zip
 | Path | Purpose |
 |------|---------|
 | `cmd/autocrm/` | CLI entrypoint and install/doctor/uninstall commands. |
+| `assets/` | macOS app icon asset catalog. |
 | `internal/collectors/` | iMessage, phone, and Beeper collectors. |
 | `internal/outbox/` | SQLite outbox and ingest cursors. |
 | `internal/notion/` | Notion API integration and outbox sync. |

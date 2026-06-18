@@ -16,7 +16,7 @@ AutoCRM is a **macOS-only** Go tool that records **inbound and outbound** commun
 | `internal/common/` | `~/.autocrm` paths, Apple epoch, Notion constants. |
 | `internal/collectors/` | iMessage, phone, Beeper collectors. |
 | `internal/testfixtures/` | Minimal `chat.db` for tests. |
-| `launchd/com.user.autocrm.plist.example` | LaunchAgent template. |
+| `assets/` | macOS app icon asset catalog. |
 | `scripts/e2e_verify.sh` | `go test` + `go run ./cmd/autocrm`. |
 
 Run tests: `go test ./...` from repo root.
@@ -46,7 +46,7 @@ launchd → autocrm binary → collectors → outbox table
 - Group chats: `;+;` in `chat_identifier` or `guid`; outbound fans out to `chat_handle_join` members.
 - Apple `message.date` is nanoseconds since 2001-01-01 UTC — `common.AppleNsToUnix`.
 - Bootstrap: no cursor → set cursor to `MAX(ROWID)` without backfill.
-- **Full Disk Access** is per executable: terminal runs require FDA on the terminal app; launchd runs require FDA on the `autocrm` binary.
+- **Full Disk Access** is per executable: terminal runs require FDA on the terminal app; launchd runs require FDA on the installed `~/.autocrm/AutoCRM.app`; `doctor` launches an installed-app probe for FDA checks.
 
 ## Phone calls notes
 
@@ -61,6 +61,13 @@ launchd → autocrm binary → collectors → outbox table
 - Only `NOTION_TOKEN` and `NOTION_DATABASE_ID` from environment.
 - Property names and rate limits: `internal/common/common.go`.
 - Parallel PATCHes: `common.NotionPatchWorkers` goroutines with staggered starts.
+
+## Packaging and install
+
+- Release zips contain `AutoCRM.app` plus `README.txt`.
+- `scripts/package_release.sh <version>` builds arm64 and amd64 app zips and compiles `assets/Assets.xcassets` with `xcrun actool`.
+- `autocrm install` must be run from `AutoCRM.app/Contents/MacOS/autocrm`; it copies the app bundle to `~/.autocrm/AutoCRM.app` and writes/loads `~/Library/LaunchAgents/com.user.autocrm.plist`.
+- `autocrm uninstall` unloads/removes the LaunchAgent, installed app, `~/.autocrm`, and `/tmp/autocrm.log` / `/tmp/autocrm.err`.
 
 ## Verification
 
