@@ -24,6 +24,8 @@ func main() {
 	switch os.Args[1] {
 	case "run":
 		runPipeline()
+	case "version":
+		printVersion(os.Stdout)
 	case "help", "-h", "--help":
 		printUsage(os.Stdout)
 	default:
@@ -41,8 +43,18 @@ Usage:
 
 Commands:
   run      Run collectors and sync pending activity to Notion
+  version  Show version information
   help     Show this help
 `)
+}
+
+var (
+	version = "dev"
+	commit  = "unknown"
+)
+
+func printVersion(out *os.File) {
+	fmt.Fprintf(out, "autocrm %s (%s)\n", version, commit)
 }
 
 func runPipeline() {
