@@ -1,114 +1,290 @@
-# AutoCRM
+<div align="center">
+  <img src="assets/Assets.xcassets/AppIcon.appiconset/256.png" alt="AutoCRM app icon" width="128" height="128">
+  <h1>AutoCRM</h1>
+  <p><strong>Keep your Notion people database current from Mac communication activity.</strong></p>
+  <p>AutoCRM runs quietly on macOS, records recent communication activity locally, and syncs matched contacts to Notion.</p>
+  <p>
+    <a href="https://github.com/akpiya/AutoCRM/releases">Download</a>
+    ·
+    <a href="#4-install">Install</a>
+    ·
+    <a href="#troubleshooting">Troubleshooting</a>
+    ·
+    <a href="#privacy">Privacy</a>
+  </p>
+</div>
 
-AutoCRM records communication activity on your Mac into a local SQLite **outbox** (`~/.autocrm/outbox.db`), then syncs matched contacts to a Notion people database. iMessage and phone call collectors are implemented; Beeper remains a stub.
+> **Full Disk Access required:** AutoCRM needs macOS Full Disk Access to read Messages and call history. Without it, the app can install but cannot collect useful communication activity.
 
-Implemented in **Go** (module `github.com/akpiya/autocrm`).
+AutoCRM reads recent iMessage/SMS and phone/FaceTime activity from your Mac, stores pending updates in a local SQLite outbox, and syncs matched people in Notion with:
 
-## Quickstart
+- `Last Contacted`
+- `Last Channel`
 
-### 1. Build
+AutoCRM is designed to run quietly in the background with `launchd`.
 
-```bash
-go build -o ~/.local/bin/autocrm ./cmd/autocrm
-```
+## Current Status
 
-### 2. Grant Full Disk Access
+Implemented:
 
-AutoCRM reads:
+- iMessage/SMS activity
+- phone and FaceTime call activity
+- Notion sync
+- background installation with LaunchAgent
 
-- `~/Library/Messages/chat.db` (iMessage/SMS)
-- `~/Library/Application Support/CallHistoryDB/CallHistory.storedata` (phone/FaceTime call history)
+Not implemented yet:
 
-macOS checks Full Disk Access on the process that opens those files:
+- Beeper Desktop collection
+- a graphical macOS app
+- Apple notarization
 
-- terminal runs: grant FDA to the terminal app (Terminal, iTerm, Alacritty, Cursor, etc.)
-- launchd runs: grant FDA to `~/.local/bin/autocrm`
+Because AutoCRM is not notarized by Apple, macOS may warn you before running it. You can still use it, but you will need to approve it manually in System Settings.
 
-After toggling FDA, fully restart the app (or log out/in) before retrying.
+## Requirements
 
-### 3. Set up your Notion database
+- macOS
+- a Notion account
+- a Notion integration token
+- a Notion people database
+- Full Disk Access for the installed AutoCRM app
 
-Create a Notion database with these properties (names must match exactly):
+You do not need Go installed if you download a release zip.
+
+## 1. Create a Notion Integration
+
+1. Open [Notion integrations](https://www.notion.so/my-integrations).
+2. Create a new internal integration.
+3. Copy the integration secret. AutoCRM will ask for this during install.
+
+## 2. Create the Notion Database
+
+Create or choose a Notion database for people.
+
+You can duplicate this compatible Notion template to start with the required schema:
+
+https://inquisitive-ice-1d4.notion.site/3846af520ced80d09a67c6a75abbd1de?v=34e6af520ced8248bb318831bced6ecb
+
+AutoCRM requires these property names exactly:
 
 | Property | Type | Notes |
 |----------|------|-------|
-| **Phones** | Multi-select | One tag per phone number, any format |
-| **Emails** | Email or Multi-select | |
-| **Last Contacted** | Date | |
-| **Last Channel** | Select | Include **Text**, **Phone**, and **Facetime** options |
+| `Name` | Title | Your person's name. |
+| `Phones` | Multi-select | One phone number per tag. Formatting can vary. |
+| `Emails` | Email or Multi-select | Email matching is case-insensitive. |
+| `Last Contacted` | Date | AutoCRM updates this when it sees newer activity. |
+| `Last Channel` | Select | Include `Text`, `Phone`, and `Facetime` options. |
 
-Then create a [Notion integration](https://www.notion.so/my-integrations), share the database with it, and grab the token and database ID.
+Then share the database with your Notion integration:
 
-### 4. Run
+1. Open the database in Notion.
+2. Click `...` in the top-right.
+3. Choose `Connections`.
+4. Add your integration.
 
-Without Notion (collector + outbox only):
+Copy the database ID from the database URL. AutoCRM will ask for it during install.
 
-```bash
-~/.local/bin/autocrm
+## 3. Download AutoCRM
+
+Download the correct zip from GitHub Releases:
+
+- Apple Silicon Macs: `autocrm-macos-arm64.zip`
+- Intel Macs: `autocrm-macos-amd64.zip`
+
+Most M1, M2, M3, and M4 Macs use Apple Silicon.
+
+Unzip the file. It contains:
+
+```text
+AutoCRM.app
+README.txt
 ```
 
-With Notion sync:
+## 4. Install
 
-```bash
-export NOTION_TOKEN="secret_..."
-export NOTION_DATABASE_ID="your-database-id"
-~/.local/bin/autocrm
-```
-
-The first run bootstraps the cursor to `MAX(ROWID)` without backfilling old messages. Subsequent runs pick up new messages incrementally.
-
-### 5. Import existing contacts (one-time, optional)
-
-If you have a vCard export of your contacts:
-
-```bash
-python3 scripts/import_imessage_notion.py path/to/contacts.vcf
-```
-
-This walks each contact interactively and creates Notion pages for the ones you choose. Same `NOTION_TOKEN` / `NOTION_DATABASE_ID` env vars required.
-
-### 6. Install the LaunchAgent
+Open Terminal in the unzipped folder and run:
 
 ```bash
 ./AutoCRM.app/Contents/MacOS/autocrm install
 ```
 
-The installer writes the LaunchAgent with your Notion configuration and loads it with `launchctl`.
+If macOS refuses to run the downloaded app, open System Settings > Privacy & Security and approve AutoCRM. If Terminal still reports that the app is blocked, remove the download quarantine flag:
 
----
+```bash
+xattr -dr com.apple.quarantine ./AutoCRM.app
+```
 
-## Layout
+The installer will:
+
+1. Show the required Notion database setup.
+2. Ask for your Notion integration token.
+3. Ask for your Notion database ID.
+4. Validate that Notion is reachable and has the required properties.
+5. Copy AutoCRM to `~/.autocrm/AutoCRM.app`.
+6. Write `~/Library/LaunchAgents/com.user.autocrm.plist`.
+7. Guide you through enabling Full Disk Access.
+8. Load the background LaunchAgent.
+
+The default background sync interval is 5 minutes.
+
+The Notion token and database ID are stored locally in:
+
+```text
+~/Library/LaunchAgents/com.user.autocrm.plist
+```
+
+## 5. Enable Full Disk Access
+
+AutoCRM reads these local macOS databases:
+
+- `~/Library/Messages/chat.db`
+- `~/Library/Application Support/CallHistoryDB/CallHistory.storedata`
+
+macOS blocks those files unless the exact executable has Full Disk Access.
+
+During install, enable Full Disk Access for:
+
+```text
+~/.autocrm/AutoCRM.app
+```
+
+If AutoCRM cannot read Messages or call history, run:
+
+```bash
+~/.autocrm/AutoCRM.app/Contents/MacOS/autocrm doctor
+```
+
+## Commands
+
+The installed command lives at:
+
+```text
+~/.autocrm/AutoCRM.app/Contents/MacOS/autocrm
+```
+
+```bash
+autocrm install
+autocrm run
+autocrm doctor
+autocrm uninstall
+```
+
+`autocrm run` runs one collector/sync pass. The LaunchAgent uses this command in the background.
+
+`autocrm doctor` checks:
+
+- Notion credentials
+- required Notion database properties
+- Messages database readability through the installed app
+- call history database readability through the installed app
+- installed app location
+- LaunchAgent presence
+
+The Notion portion of `doctor` reads `NOTION_TOKEN` and `NOTION_DATABASE_ID` from the current environment. The background LaunchAgent gets those values from its plist.
+
+`autocrm uninstall` unloads and removes the LaunchAgent, installed app, local AutoCRM data directory, and logs.
+
+## Logs
+
+Background logs are written to:
+
+```text
+/tmp/autocrm.log
+/tmp/autocrm.err
+```
+
+## Behavior
+
+AutoCRM keeps local state under:
+
+```text
+~/.autocrm/
+```
+
+The outbox database is:
+
+```text
+~/.autocrm/outbox.db
+```
+
+First run behavior:
+
+- iMessage bootstraps to the current max message row without backfilling old messages.
+- phone calls bootstrap to the current max call row without backfilling old calls.
+- later runs process new activity incrementally.
+
+Notion sync behavior:
+
+- unmatched outbox rows are removed silently
+- `Last Contacted` only moves forward
+- phone matching strips non-digits and handles US numbers with or without leading `1`
+- channel labels are `Text`, `Phone`, and `Facetime`
+
+## Troubleshooting
+
+Run:
+
+```bash
+~/.autocrm/AutoCRM.app/Contents/MacOS/autocrm doctor
+```
+
+Common issues:
+
+| Problem | Fix |
+|---------|-----|
+| Notion validation fails | Confirm the token, database ID, database sharing, and required properties. |
+| Messages database fails | Enable Full Disk Access for `~/.autocrm/AutoCRM.app`. |
+| Call history database fails | Enable Full Disk Access for `~/.autocrm/AutoCRM.app`. |
+| No Notion pages update | Confirm people have matching values in `Phones` or `Emails`. |
+| macOS blocks the app | Open System Settings > Privacy & Security and approve AutoCRM. |
+
+## Building From Source
+
+Developer requirements:
+
+- Go 1.22+
+- CGO support
+- SQLite driver dependencies for `github.com/mattn/go-sqlite3`
+- Xcode command-line tools for release packaging (`xcrun actool`)
+
+Build:
+
+```bash
+go build -o ./bin/autocrm ./cmd/autocrm
+```
+
+Run tests:
+
+```bash
+go test ./...
+```
+
+Package release zips:
+
+```bash
+scripts/package_release.sh v0.1.0
+```
+
+This writes:
+
+```text
+dist/autocrm-macos-arm64.zip
+dist/autocrm-macos-amd64.zip
+```
+
+## Repository Layout
 
 | Path | Purpose |
 |------|---------|
-| `internal/` | App implementation: `common`, `outbox`, `notion`, `collectors`. |
-| `cmd/autocrm/` | Main pipeline binary. |
-| `assets/` | App icon source assets. |
-| `scripts/import_imessage_notion.py` | Interactive vCard → Notion import (Python). |
-| `go.mod` | Go module definition. |
+| `cmd/autocrm/` | CLI entrypoint and install/doctor/uninstall commands. |
+| `assets/` | macOS app icon asset catalog. |
+| `internal/collectors/` | iMessage, phone, and Beeper collectors. |
+| `internal/outbox/` | SQLite outbox and ingest cursors. |
+| `internal/notion/` | Notion API integration and outbox sync. |
+| `internal/common/` | shared paths, constants, and time helpers. |
+| `scripts/package_release.sh` | release zip builder. |
 
-## Notion sync details
+## Privacy
 
-State lives under **`~/.autocrm/`** (outbox DB at `outbox.db`, per-source cursors). The `outbox` table is a pending sync queue; rows are deleted after processing.
+AutoCRM reads local communication metadata needed to identify contact activity. It stores pending sync rows locally in SQLite and sends matched updates to the Notion integration you configure.
 
-- **Unmatched rows** (no Notion page with that phone/email) are removed silently.
-- **Last Contacted** only moves forward — an older outbox event won't overwrite a newer value on the page.
-- **Multiple phones or emails per person:** use Multi-select on the Phones and Emails columns. AutoCRM matches if the iMessage handle equals any value on that page.
-- **Phone formatting:** tags can be `+1 703-395-5764`, `(703) 395-5764`, `7033955764`, etc. Matching strips non-digits and compares US numbers with or without a leading `1`.
-
-Property names, rate-limit interval, and parallel PATCH worker count live in [`internal/common/common.go`](internal/common/common.go). Change those constants if your Notion schema differs.
-
-## Phone calls collector behavior
-
-- Source DB: `~/Library/Application Support/CallHistoryDB/CallHistory.storedata`.
-- Event scope: connected inbound/outbound calls only.
-- Included sources: cellular + FaceTime (audio/video).
-- Excluded in this version: missed/unanswered calls.
-- First run bootstrap: if no `phone_calls` cursor exists, cursor is set to current max call row id without backfill.
-
-## Requirements
-
-- **macOS** for iMessage / future call-history collectors.
-- **Go 1.22+** and CGO (for `github.com/mattn/go-sqlite3`).
-
-See **`internal/README.md`** for package layout.
+AutoCRM does not include a server component.
