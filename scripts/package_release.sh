@@ -86,6 +86,10 @@ AutoCRM $version for macOS $arch
 Install:
   ./AutoCRM.app/Contents/MacOS/autocrm install
 
+You can also double-click AutoCRM.app. If AutoCRM is not installed yet, it opens
+Terminal and starts the installer. If AutoCRM is already installed, double-clicking
+exits without changing anything.
+
 The installer copies AutoCRM.app to ~/.autocrm/AutoCRM.app, writes a LaunchAgent,
 and guides you through granting Full Disk Access to the installed app.
 

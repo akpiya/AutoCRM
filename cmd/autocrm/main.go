@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -17,8 +19,7 @@ func main() {
 	log.SetFlags(log.LstdFlags)
 
 	if len(os.Args) < 2 {
-		printUsage(os.Stderr)
-		os.Exit(2)
+		os.Exit(runDefaultLaunch())
 	}
 
 	switch os.Args[1] {
@@ -39,6 +40,48 @@ func main() {
 		printUsage(os.Stderr)
 		os.Exit(2)
 	}
+}
+
+func runDefaultLaunch() int {
+	if _, err := sourceAppPath(); err != nil {
+		printUsage(os.Stderr)
+		return 2
+	}
+
+	installedApp, err := installedAppPath()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "unable to resolve installed app path: %v\n", err)
+		return 1
+	}
+	if info, err := os.Stat(installedApp); err == nil && info.IsDir() {
+		return 0
+	} else if err != nil && !os.IsNotExist(err) {
+		fmt.Fprintf(os.Stderr, "unable to check installed app: %v\n", err)
+		return 1
+	}
+
+	exe, err := os.Executable()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "unable to resolve executable path: %v\n", err)
+		return 1
+	}
+	exe, err = filepath.EvalSymlinks(exe)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "unable to resolve executable path: %v\n", err)
+		return 1
+	}
+
+	command := shellQuote(exe) + " install"
+	script := fmt.Sprintf(`tell application "Terminal" to do script %q`, command)
+	if err := exec.Command("osascript", "-e", script).Run(); err != nil {
+		fmt.Fprintf(os.Stderr, "unable to open installer in Terminal: %v\n", err)
+		return 1
+	}
+	return 0
+}
+
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "'\\''") + "'"
 }
 
 func printUsage(out *os.File) {
