@@ -16,12 +16,7 @@
 
 > **Full Disk Access required:** AutoCRM needs macOS Full Disk Access to read Messages and call history. Without it, the app can install but cannot collect useful communication activity.
 
-AutoCRM reads recent iMessage/SMS and phone/FaceTime activity from your Mac, stores pending updates in a local SQLite outbox, and syncs matched people in Notion with:
-
-- `Last Contacted`
-- `Last Channel`
-
-AutoCRM is designed to run quietly in the background with `launchd`.
+AutoCRM reads recent iMessage/SMS and phone/FaceTime activity from your Mac, stores pending updates in a local SQLite outbox, and syncs matched people in a Notion database.
 
 ## Current Status
 
@@ -35,8 +30,6 @@ Implemented:
 Not implemented yet:
 
 - Beeper Desktop collection
-- a graphical macOS app
-- Apple notarization
 
 Because AutoCRM is not notarized by Apple, macOS may warn you before running it. You can still use it, but you will need to approve it manually in System Settings.
 
