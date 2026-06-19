@@ -14,6 +14,8 @@
   </p>
 </div>
 
+> **Full Disk Access required:** AutoCRM needs macOS Full Disk Access to read Messages and call history. Without it, the app can install but cannot collect useful communication activity.
+
 AutoCRM reads recent iMessage/SMS and phone/FaceTime activity from your Mac, stores pending updates in a local SQLite outbox, and syncs matched people in Notion with:
 
 - `Last Contacted`
