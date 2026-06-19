@@ -1,8 +1,8 @@
 <div align="center">
   <img src="assets/Assets.xcassets/AppIcon.appiconset/256.png" alt="AutoCRM app icon" width="128" height="128">
   <h1>AutoCRM</h1>
-  <p><strong>Keep your Notion people database current from Mac communication activity.</strong></p>
-  <p>AutoCRM runs quietly on macOS, records recent communication activity locally, and syncs matched contacts to Notion.</p>
+  <p><strong>Know the last time you contacted someone, who needs a follow-up, and who has gone quiet for too long.</strong></p>
+  <p>AutoCRM runs quietly on macOS, records recent communication activity locally, and keeps your Notion people database current.</p>
   <p>
     <a href="https://github.com/akpiya/AutoCRM/releases">Download</a>
     ·
