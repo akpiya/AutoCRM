@@ -86,6 +86,13 @@ AutoCRM $version for macOS $arch
 Install:
   ./AutoCRM.app/Contents/MacOS/autocrm install
 
+If macOS says AutoCRM is damaged, blocked, or cannot be opened, remove the
+download quarantine flag and try again:
+  xattr -dr com.apple.quarantine ./AutoCRM.app
+
+You may also need to open System Settings > Privacy & Security and approve
+AutoCRM.
+
 The installer copies AutoCRM.app to ~/.autocrm/AutoCRM.app, writes a LaunchAgent,
 and guides you through granting Full Disk Access to the installed app.
 
@@ -94,8 +101,7 @@ Other commands:
   ~/.autocrm/AutoCRM.app/Contents/MacOS/autocrm run
   ~/.autocrm/AutoCRM.app/Contents/MacOS/autocrm uninstall
 
-This app is not notarized by Apple. macOS may require you to approve it in
-Privacy & Security before it can run.
+This app is not notarized by Apple.
 EOF
 
   (cd "$work_dir" && zip -q -r "$zip_path" AutoCRM.app README.txt)

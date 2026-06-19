@@ -100,11 +100,13 @@ Open Terminal in the unzipped folder and run:
 ./AutoCRM.app/Contents/MacOS/autocrm install
 ```
 
-If macOS refuses to run the downloaded app, open System Settings > Privacy & Security and approve AutoCRM. If Terminal still reports that the app is blocked, remove the download quarantine flag:
+If macOS says AutoCRM is damaged, blocked, or cannot be opened, remove the download quarantine flag and try again:
 
 ```bash
 xattr -dr com.apple.quarantine ./AutoCRM.app
 ```
+
+You may also need to open System Settings > Privacy & Security and approve AutoCRM.
 
 The installer will:
 
