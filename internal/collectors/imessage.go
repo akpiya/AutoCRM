@@ -12,9 +12,11 @@ import (
 
 // IMessageCollector reads Messages chat.db into the outbox.
 type IMessageCollector struct {
-	AppName      string
-	ChatDBPath   string
-	OutboxDBPath string
+	AppName           string
+	ChatDBPath        string
+	OutboxDBPath      string
+	BootstrapLookback time.Duration
+	Now               func() time.Time
 }
 
 // NewIMessageCollector returns a collector with default paths.
@@ -80,6 +82,28 @@ func eventsForMessage(row MessageRow) []outbox.Event {
 	}}
 }
 
+func (c *IMessageCollector) bootstrapLookback() time.Duration {
+	if c.BootstrapLookback > 0 {
+		return c.BootstrapLookback
+	}
+	return 10 * time.Minute
+}
+
+func (c *IMessageCollector) now() time.Time {
+	if c.Now != nil {
+		return c.Now()
+	}
+	return time.Now()
+}
+
+func appleNSTime(t time.Time) int64 {
+	d := t.UTC().Sub(common.AppleEpochUTC)
+	if d <= 0 {
+		return 0
+	}
+	return d.Nanoseconds()
+}
+
 // Collect ingests messages after the stored cursor.
 func (c *IMessageCollector) Collect() (CollectResult, error) {
 	if _, err := os.Stat(c.ChatDBPath); err != nil {
@@ -96,23 +120,19 @@ func (c *IMessageCollector) Collect() (CollectResult, error) {
 	}
 
 	if cursorBefore == nil {
-		maxRow, err := MaxMessageRowid(c.ChatDBPath)
+		cutoff := c.now().Add(-c.bootstrapLookback())
+		effectiveCursor, err := MaxMessageRowidBeforeAppleNS(c.ChatDBPath, appleNSTime(cutoff))
 		if err != nil {
 			return CollectResult{}, err
 		}
-		cv := float64(maxRow)
-		if _, err := outbox.IngestBatch(c.App(), nil, &cv, c.OutboxDBPath); err != nil {
-			return CollectResult{}, err
-		}
-		log.Printf("imessage bootstrap cursor=%d in %.2fs", maxRow, time.Since(t0).Seconds())
-		return CollectResult{
-			Source:       c.App(),
-			Enqueued:     0,
-			CursorAfter:  &cv,
-		}, nil
+		log.Printf("imessage bootstrap lookback=%.0fm effective_cursor=%d cutoff=%s", c.bootstrapLookback().Minutes(), effectiveCursor, cutoff.Format(time.RFC3339))
+		return c.collectAfterCursor(effectiveCursor, nil, t0)
 	}
 
-	lastRow := int(*cursorBefore)
+	return c.collectAfterCursor(int(*cursorBefore), cursorBefore, t0)
+}
+
+func (c *IMessageCollector) collectAfterCursor(lastRow int, cursorBefore *float64, t0 time.Time) (CollectResult, error) {
 	tFetch := time.Now()
 	rows, err := FetchMessagesAfterRowid(c.ChatDBPath, lastRow)
 	if err != nil {
@@ -133,8 +153,7 @@ func (c *IMessageCollector) Collect() (CollectResult, error) {
 
 	enqueued := 0
 	ingestS := 0.0
-	before := float64(lastRow)
-	if maxRow > lastRow || len(events) > 0 {
+	if cursorBefore == nil || maxRow > lastRow || len(events) > 0 {
 		cv := float64(maxRow)
 		tIngest := time.Now()
 		enqueued, err = outbox.IngestBatch(c.App(), events, &cv, c.OutboxDBPath)
@@ -150,7 +169,7 @@ func (c *IMessageCollector) Collect() (CollectResult, error) {
 		return CollectResult{
 			Source:       c.App(),
 			Enqueued:     enqueued,
-			CursorBefore: &before,
+			CursorBefore: cursorBefore,
 			CursorAfter:  &after,
 		}, nil
 	}
@@ -163,7 +182,7 @@ func (c *IMessageCollector) Collect() (CollectResult, error) {
 	return CollectResult{
 		Source:       c.App(),
 		Enqueued:     enqueued,
-		CursorBefore: &before,
+		CursorBefore: cursorBefore,
 		CursorAfter:  &after,
 	}, nil
 }

@@ -10,12 +10,12 @@ import (
 
 // MessageRow is one message from chat.db.
 type MessageRow struct {
-	RowID          int
-	MDate          int64
-	IsFromMe       bool
-	SenderHandle   string
-	IsGroup        bool
-	MemberHandles  []string
+	RowID         int
+	MDate         int64
+	IsFromMe      bool
+	SenderHandle  string
+	IsGroup       bool
+	MemberHandles []string
 }
 
 // MaxMessageRowid returns MAX(ROWID) from message, or 0.
@@ -27,6 +27,24 @@ func MaxMessageRowid(chatDB string) (int, error) {
 	defer db.Close()
 	var max sql.NullInt64
 	err = db.QueryRow(`SELECT MAX(ROWID) FROM message`).Scan(&max)
+	if err != nil || !max.Valid {
+		return 0, err
+	}
+	return int(max.Int64), nil
+}
+
+// MaxMessageRowidBeforeAppleNS returns MAX(ROWID) for messages before appleNS, or 0.
+func MaxMessageRowidBeforeAppleNS(chatDB string, appleNS int64) (int, error) {
+	db, err := openChatDB(chatDB)
+	if err != nil {
+		return 0, err
+	}
+	defer db.Close()
+	var max sql.NullInt64
+	err = db.QueryRow(
+		`SELECT MAX(ROWID) FROM message WHERE date > 0 AND date < ?`,
+		appleNS,
+	).Scan(&max)
 	if err != nil || !max.Valid {
 		return 0, err
 	}

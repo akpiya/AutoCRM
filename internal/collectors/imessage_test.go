@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/akpiya/autocrm/internal/collectors"
 	"github.com/akpiya/autocrm/internal/common"
@@ -153,7 +154,7 @@ func TestMissingChatDBRaises(t *testing.T) {
 	}
 }
 
-func TestMissingCursorSkipsIngestAndSetsMaxRowid(t *testing.T) {
+func TestMissingCursorIngestsTenMinuteLookback(t *testing.T) {
 	dir := t.TempDir()
 	chatDB := filepath.Join(dir, "chat.db")
 	if err := testfixtures.BuildChatDB(chatDB); err != nil {
@@ -161,14 +162,18 @@ func TestMissingCursorSkipsIngestAndSetsMaxRowid(t *testing.T) {
 	}
 	outboxDB := filepath.Join(dir, "outbox.db")
 	c := &collectors.IMessageCollector{
-		ChatDBPath:   chatDB,
-		OutboxDBPath: outboxDB,
+		ChatDBPath:        chatDB,
+		OutboxDBPath:      outboxDB,
+		BootstrapLookback: 10 * time.Minute,
+		Now: func() time.Time {
+			return common.AppleEpochUTC.Add(time.Duration(testfixtures.AppleNS20010102) + 10*time.Minute + 2500*time.Millisecond)
+		},
 	}
 	result, err := c.Collect()
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.Enqueued != 0 || result.CursorBefore != nil {
+	if result.Enqueued != 5 || result.CursorBefore != nil {
 		t.Fatalf("result=%+v", result)
 	}
 	if result.CursorAfter == nil || *result.CursorAfter != 7 {
@@ -182,7 +187,7 @@ func TestMissingCursorSkipsIngestAndSetsMaxRowid(t *testing.T) {
 	defer db.Close()
 	var count int
 	_ = db.QueryRow(`SELECT COUNT(*) FROM outbox`).Scan(&count)
-	if count != 0 {
+	if count != 5 {
 		t.Fatalf("count=%d", count)
 	}
 }
