@@ -60,6 +60,10 @@ You do not need Go installed if you download a release zip.
 
 Create or choose a Notion database for people.
 
+You can duplicate this compatible Notion template to start with the required schema:
+
+https://inquisitive-ice-1d4.notion.site/3846af520ced80d09a67c6a75abbd1de?v=34e6af520ced8248bb318831bced6ecb
+
 AutoCRM requires these property names exactly:
 
 | Property | Type | Notes |
