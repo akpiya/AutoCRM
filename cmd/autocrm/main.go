@@ -17,8 +17,8 @@ func main() {
 	log.SetFlags(log.LstdFlags)
 
 	if len(os.Args) < 2 {
-		printUsage(os.Stderr)
-		os.Exit(2)
+		printUsage(os.Stdout)
+		os.Exit(0)
 	}
 
 	switch os.Args[1] {
